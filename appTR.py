@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QVBo
 from PyQt5.QtCore import QTimer, Qt, QUrl
 from PyQt5.QtGui import QDesktopServices
 
-DISCORD_WEBHOOK_URL = "https://discord.com/oauth2/authorize?client_id=1043328961972801729&response_type=code&redirect_uri=https%3A%2F%2Fwww.linkol.in%2F&scope=webhook.incoming"
+DISCORD_WEBHOOK_URL = "YOUR_DISCORD_WEBHOOK_URL"
 DEVELOPER_URL = "https://mebularts.com.tr"
 
 class DiscordBot(QMainWindow):
