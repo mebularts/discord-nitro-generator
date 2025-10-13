@@ -54,7 +54,12 @@ class OrderRepository
 
     public function forUser(int $userId): array
     {
-        $sql = 'SELECT o.*, s.name AS service_name, c.name AS country_name FROM orders o JOIN services s ON s.id = o.service_id JOIN countries c ON c.id = o.country_id WHERE o.user_id = :user_id ORDER BY o.created_at DESC';
+        $sql = 'SELECT o.*, s.name AS service_name, c.name AS country_name '
+            . 'FROM orders o '
+            . 'JOIN services s ON s.id = o.service_id '
+            . 'JOIN countries c ON c.id = o.country_id '
+            . 'WHERE o.user_id = :user_id '
+            . 'ORDER BY o.created_at DESC';
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute(['user_id' => $userId]);
 

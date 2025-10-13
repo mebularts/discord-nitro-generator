@@ -7,8 +7,10 @@ use App\Support\Config;
 
 class PaymentService
 {
-    private PaymentRepository $payments;
-    private UserRepository $users;
+    /** @var PaymentRepository */
+    private $payments;
+    /** @var UserRepository */
+    private $users;
 
     public function __construct()
     {
@@ -60,23 +62,37 @@ class PaymentService
 
     private function labelForMethod(string $method): string
     {
-        return match ($method) {
-            'telegram_stars' => 'Telegram Stars ile Yükle',
-            'iban' => 'IBAN ile Ödeme',
-            'crypto' => 'Kripto ile Ödeme',
-            'online_crypto' => 'Online Kripto ile Ödeme',
-            default => ucfirst($method),
-        };
+        switch ($method) {
+            case 'telegram_stars':
+                return 'Telegram Stars ile Yükle';
+            case 'iban':
+                return 'IBAN ile Ödeme';
+            case 'crypto':
+                return 'Kripto ile Ödeme';
+            case 'online_crypto':
+                return 'Online Kripto ile Ödeme';
+            default:
+                return ucfirst($method);
+        }
     }
 
     private function instructionsForMethod(string $method, array $config): string
     {
-        return match ($method) {
-            'telegram_stars' => 'Telegram Stars ile ödeme yapmak için lütfen uygulama içindeki yönlendirmeleri takip edin.',
-            'iban' => sprintf("Lütfen %s IBAN numarasına %s adına ödeme yapın ve dekontu iletin.", $config['iban'] ?? '***', $config['holder'] ?? '***'),
-            'crypto' => sprintf('Aşağıdaki cüzdana transfer yapın: %s', $config['address'] ?? '***'),
-            'online_crypto' => sprintf('Online kripto sağlayıcısı: %s üzerinden ödeme yapabilirsiniz.', $config['provider'] ?? '***'),
-            default => 'Ödeme talimatları için destek ile iletişime geçin.',
-        };
+        switch ($method) {
+            case 'telegram_stars':
+                return 'Telegram Stars ile ödeme yapmak için lütfen uygulama içindeki yönlendirmeleri takip edin.';
+            case 'iban':
+                return sprintf(
+                    'Lütfen %s IBAN numarasına %s adına ödeme yapın ve dekontu iletin.',
+                    $config['iban'] ?? '***',
+                    $config['holder'] ?? '***'
+                );
+            case 'crypto':
+                return sprintf('Aşağıdaki cüzdana transfer yapın: %s', $config['address'] ?? '***');
+            case 'online_crypto':
+                return sprintf('Online kripto sağlayıcısı: %s üzerinden ödeme yapabilirsiniz.', $config['provider'] ?? '***');
+            default:
+                return 'Ödeme talimatları için destek ile iletişime geçin.';
+        }
     }
 }

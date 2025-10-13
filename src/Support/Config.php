@@ -3,7 +3,8 @@ namespace App\Support;
 
 class Config
 {
-    private static array $config = [];
+    /** @var array */
+    private static $config = [];
 
     public static function load(array $config): void
     {

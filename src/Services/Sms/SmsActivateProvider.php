@@ -5,8 +5,10 @@ use App\Support\Config;
 
 class SmsActivateProvider implements SmsProviderInterface
 {
-    private string $apiKey;
-    private string $baseUrl;
+    /** @var string */
+    private $apiKey;
+    /** @var string */
+    private $baseUrl;
 
     public function __construct()
     {

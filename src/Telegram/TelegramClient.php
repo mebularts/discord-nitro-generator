@@ -5,20 +5,32 @@ use App\Support\Config;
 
 class TelegramClient
 {
-    private string $apiUrl;
+    /** @var string */
+    private $apiUrl;
 
     public function __construct(?string $botToken = null)
     {
         $token = $botToken ?: Config::get('telegram.bot_token');
+        if (!$token) {
+            throw new \RuntimeException('Telegram bot token is not configured.');
+        }
+
         $this->apiUrl = 'https://api.telegram.org/bot' . $token . '/';
     }
 
     public function sendRequest(string $method, array $params = []): array
     {
+        $filteredParams = [];
+        foreach ($params as $key => $value) {
+            if ($value !== null) {
+                $filteredParams[$key] = $value;
+            }
+        }
+
         $ch = curl_init($this->apiUrl . $method);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $filteredParams);
 
         $response = curl_exec($ch);
         if ($response === false) {

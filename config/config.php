@@ -1,5 +1,8 @@
 <?php
 return [
+    'app' => [
+        'name' => getenv('APP_NAME') ?: 'Telegram SMS Mağazası',
+    ],
     'telegram' => [
         'bot_token' => getenv('TELEGRAM_BOT_TOKEN') ?: '',
         'admin_chat_id' => getenv('TELEGRAM_ADMIN_CHAT_ID') ?: '',
@@ -38,6 +41,6 @@ return [
         'panel_token' => getenv('ADMIN_PANEL_TOKEN') ?: 'change-me',
     ],
     'database' => [
-        'path' => __DIR__ . '/../storage/database.sqlite',
+        'path' => getenv('DATABASE_PATH') ?: (__DIR__ . '/../storage/database.sqlite'),
     ],
 ];

@@ -9,9 +9,23 @@ class ProviderFactory
     {
         $provider = $provider ?: Config::get('providers.preferred', '5sim');
 
-        return match ($provider) {
-            'sms_activate' => new SmsActivateProvider(),
-            default => new FiveSimProvider(),
-        };
+        switch ($provider) {
+            case 'sms_activate':
+                return new SmsActivateProvider();
+            default:
+                return new FiveSimProvider();
+        }
+    }
+
+    public static function fromClass(?string $providerClass): SmsProviderInterface
+    {
+        switch ($providerClass) {
+            case SmsActivateProvider::class:
+                return new SmsActivateProvider();
+            case FiveSimProvider::class:
+                return new FiveSimProvider();
+            default:
+                return self::make();
+        }
     }
 }

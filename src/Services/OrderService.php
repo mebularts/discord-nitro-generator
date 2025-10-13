@@ -10,11 +10,16 @@ use App\Services\Sms\SmsProviderInterface;
 
 class OrderService
 {
-    private UserRepository $users;
-    private ServiceRepository $services;
-    private CountryRepository $countries;
-    private OrderRepository $orders;
-    private SmsProviderInterface $provider;
+    /** @var UserRepository */
+    private $users;
+    /** @var ServiceRepository */
+    private $services;
+    /** @var CountryRepository */
+    private $countries;
+    /** @var OrderRepository */
+    private $orders;
+    /** @var SmsProviderInterface */
+    private $provider;
 
     public function __construct()
     {

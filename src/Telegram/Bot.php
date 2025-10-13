@@ -11,13 +11,20 @@ use App\Support\Config;
 
 class Bot
 {
-    private TelegramClient $client;
-    private UserRepository $users;
-    private ServiceRepository $services;
-    private CountryRepository $countries;
-    private OrderRepository $orders;
-    private OrderService $orderService;
-    private PaymentService $paymentService;
+    /** @var TelegramClient */
+    private $client;
+    /** @var UserRepository */
+    private $users;
+    /** @var ServiceRepository */
+    private $services;
+    /** @var CountryRepository */
+    private $countries;
+    /** @var OrderRepository */
+    private $orders;
+    /** @var OrderService */
+    private $orderService;
+    /** @var PaymentService */
+    private $paymentService;
 
     public function __construct()
     {
@@ -110,8 +117,18 @@ class Bot
         }
 
         if (strpos($data, 'country:') === 0) {
-            [$serviceId, $countryId] = array_map('intval', explode(':', substr($data, 8)));
-            $this->handlePurchase($chatId, $messageId, $user, $serviceId, $countryId);
+            $parts = explode(':', substr($data, 8));
+            if (count($parts) === 2) {
+                $serviceId = (int) $parts[0];
+                $countryId = (int) $parts[1];
+                $this->handlePurchase($chatId, $messageId, $user, $serviceId, $countryId);
+            } else {
+                $this->client->sendRequest('editMessageText', [
+                    'chat_id' => $chatId,
+                    'message_id' => $messageId,
+                    'text' => 'Geçersiz ülke seçimi alındı.',
+                ]);
+            }
             return;
         }
 
@@ -130,7 +147,10 @@ class Bot
 
     private function sendWelcome(int $chatId, array $user): void
     {
-        $text = "Merhaba {$user['first_name']}!\nTelegram mağazamıza hoş geldiniz.";
+        $firstName = trim($user['first_name'] ?? '');
+        $greeting = $firstName !== '' ? "Merhaba {$firstName}!" : 'Merhaba!';
+        $appName = Config::get('app.name', 'Telegram mağazası');
+        $text = $greeting . "\n" . $appName . ' mağazasına hoş geldiniz.';
         $this->client->sendRequest('sendMessage', [
             'chat_id' => $chatId,
             'text' => $text,
@@ -345,7 +365,11 @@ class Bot
         $adminChat = Config::get('telegram.admin_chat_id');
         $text = 'Destek için lütfen aşağıdaki kanalları kullanın:';
         if ($adminChat) {
-            $text .= "\nAdmin: @" . ltrim($adminChat, '@');
+            if (is_numeric($adminChat)) {
+                $text .= "\nAdmin Chat ID: " . $adminChat;
+            } else {
+                $text .= "\nAdmin: @" . ltrim((string) $adminChat, '@');
+            }
         }
 
         $this->client->sendRequest('editMessageText', [

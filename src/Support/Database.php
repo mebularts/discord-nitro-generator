@@ -6,7 +6,8 @@ use PDOException;
 
 class Database
 {
-    private static ?PDO $connection = null;
+    /** @var PDO|null */
+    private static $connection = null;
 
     public static function boot(): void
     {

@@ -20,7 +20,22 @@ if (!$update) {
     exit;
 }
 
-$bot = new Bot();
-$bot->handle($update);
+try {
+    $bot = new Bot();
+} catch (\Throwable $exception) {
+    error_log('[webhook] Bot init failed: ' . $exception->getMessage());
+    http_response_code(500);
+    echo 'Bot configuration error';
+    exit;
+}
+
+try {
+    $bot->handle($update);
+} catch (\Throwable $exception) {
+    error_log('[webhook] Bot handle failed: ' . $exception->getMessage());
+    http_response_code(500);
+    echo 'Internal error';
+    exit;
+}
 
 echo 'OK';
