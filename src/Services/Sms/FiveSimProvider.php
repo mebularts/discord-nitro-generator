@@ -18,12 +18,63 @@ class FiveSimProvider implements SmsProviderInterface
 
     public function getServices(): array
     {
-        return $this->request('/guest/products/telegram');
+        $response = $this->request('/guest/products');
+        $services = [];
+
+        if (isset($response['data']) && is_array($response['data'])) {
+            $response = $response['data'];
+        }
+
+        foreach ($response as $key => $service) {
+            if (is_array($service) && isset($service['id'])) {
+                $services[] = [
+                    'id' => (string) ($service['id'] ?? $key),
+                    'name' => $service['name'] ?? ($service['product'] ?? ucfirst((string) $key)),
+                    'price' => $service['price'] ?? ($service['cost'] ?? 0),
+                    'category' => $service['category'] ?? ($service['product'] ?? null),
+                    'popular' => ($service['count'] ?? 0) > 0,
+                ];
+            } elseif (is_array($service) && isset($service['products'])) {
+                foreach ($service['products'] as $productKey => $product) {
+                    $services[] = [
+                        'id' => (string) ($product['id'] ?? $productKey),
+                        'name' => $product['name'] ?? $productKey,
+                        'price' => $product['price'] ?? ($product['cost'] ?? 0),
+                        'category' => $service['category'] ?? $key,
+                        'popular' => ($product['count'] ?? 0) > 0,
+                    ];
+                }
+            }
+        }
+
+        return $services;
     }
 
     public function getCountriesForService(string $serviceId): array
     {
-        return $this->request('/guest/countries');
+        $endpoint = '/guest/products/' . urlencode($serviceId);
+        $response = $this->request($endpoint);
+        $countries = [];
+
+        if (isset($response['countries']) && is_array($response['countries'])) {
+            $response = $response['countries'];
+        }
+
+        foreach ($response as $key => $country) {
+            if (!is_array($country)) {
+                continue;
+            }
+
+            $countries[] = [
+                'provider_country_code' => (string) ($country['iso'] ?? $country['code'] ?? $key),
+                'name' => $country['name'] ?? ($country['title'] ?? $key),
+                'stock' => (int) ($country['count'] ?? $country['available'] ?? 0),
+                'price' => (float) ($country['price'] ?? $country['cost'] ?? 0),
+                'dial_prefix' => $country['prefix'] ?? null,
+            ];
+        }
+
+        return $countries;
     }
 
     public function requestNumber(string $serviceId, string $countryCode): array

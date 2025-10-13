@@ -5,6 +5,7 @@ use App\Models\CountryRepository;
 use App\Models\OrderRepository;
 use App\Models\ServiceRepository;
 use App\Models\UserRepository;
+use App\Services\CatalogSyncService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Support\Config;
@@ -25,6 +26,10 @@ class Bot
     private $orderService;
     /** @var PaymentService */
     private $paymentService;
+    /** @var CatalogSyncService */
+    private $catalog;
+    /** @var int */
+    private $lastCatalogSync = 0;
 
     public function __construct()
     {
@@ -35,6 +40,7 @@ class Bot
         $this->orders = new OrderRepository();
         $this->orderService = new OrderService();
         $this->paymentService = new PaymentService();
+        $this->catalog = new CatalogSyncService();
     }
 
     public function handle(array $update): void
@@ -203,6 +209,7 @@ class Bot
 
     private function showStore(int $chatId, int $messageId): void
     {
+        $this->ensureCatalog();
         $services = $this->services->all(true);
         if (!$services) {
             $services = $this->services->all();
@@ -238,6 +245,7 @@ class Bot
 
     private function showAllServices(int $chatId, int $messageId): void
     {
+        $this->ensureCatalog();
         $services = $this->services->all();
         if (!$services) {
             $this->client->sendRequest('editMessageText', [
@@ -276,6 +284,7 @@ class Bot
             return;
         }
 
+        $this->refreshCountriesForService($service);
         $countries = $this->countries->allForService($serviceId);
         if (!$countries) {
             $this->client->sendRequest('editMessageText', [
@@ -389,6 +398,7 @@ class Bot
             return;
         }
 
+        $this->ensureCatalog();
         $results = $this->services->search($keyword);
         if (!$results) {
             $this->client->sendRequest('sendMessage', [
@@ -400,7 +410,7 @@ class Bot
 
         $lines = [];
         foreach ($results as $service) {
-            $lines[] = sprintf('%s (#%d)', $service['name'], $service['id']);
+            $lines[] = sprintf('%s (#%d | %s)', $service['name'], $service['id'], $service['provider_service_id']);
         }
 
         $this->client->sendRequest('sendMessage', [
@@ -419,6 +429,7 @@ class Bot
             return;
         }
 
+        $this->ensureCatalog();
         $results = $this->countries->search($keyword);
         if (!$results) {
             $this->client->sendRequest('sendMessage', [
@@ -430,12 +441,38 @@ class Bot
 
         $lines = [];
         foreach ($results as $country) {
-            $lines[] = sprintf('%s (%s) - #%d', $country['name'], $country['code'], $country['id']);
+            $lines[] = sprintf('%s (%s | %s) - #%d', $country['name'], $country['code'], $country['provider_code'], $country['id']);
         }
 
         $this->client->sendRequest('sendMessage', [
             'chat_id' => $chatId,
             'text' => implode("\n", $lines),
         ]);
+    }
+
+    private function ensureCatalog(): void
+    {
+        $ttl = 300;
+        if ($this->lastCatalogSync && (time() - $this->lastCatalogSync) < $ttl) {
+            return;
+        }
+
+        try {
+            $this->catalog->syncAll();
+            $this->lastCatalogSync = time();
+        } catch (\Throwable $exception) {
+            error_log('[catalog] Sync failed: ' . $exception->getMessage());
+        }
+    }
+
+    private function refreshCountriesForService(array $service): void
+    {
+        $this->ensureCatalog();
+
+        try {
+            $this->catalog->syncCountriesForService($service);
+        } catch (\Throwable $exception) {
+            error_log('[catalog] Country sync failed: ' . $exception->getMessage());
+        }
     }
 }

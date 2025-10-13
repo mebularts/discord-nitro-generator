@@ -5,25 +5,28 @@ Bu proje, PHP 7.3 ve üzeri sürümlerde çalışacak şekilde hazırlanmış, T
 ## Özellikler
 
 - `/start` komutu ile otomatik kullanıcı kaydı ve mağaza menüsü
-- Popüler servislerin öne çıktığı mağaza akışı, tüm servisleri görüntüleme ve `/s` ile servis arama
-- Servise ait stoklu ülkeleri görüntüleme, `/u` komutu ile ülke arama
+- 5Sim veya Sms-Activate üzerinden servis ve ülke kataloglarını gerçek zamanlı senkronize etme, popüler servislerin öne çıktığı mağaza akışı ve `/s` ile servis arama
+- Servise ait stoklu ülkeleri görüntüleme, `/u` komutu ile ülke arama ve sağlayıcı stok/fiyatlarının otomatik çekilmesi
 - Bakiye yeterliyse numara satın alma, yetersizse bakiye yükleme çağrısı
 - Sağlayıcıdan gelen SMS kodunu kullanıcıya iletmek için kontrol betiği
-- Telegram Stars, IBAN, kripto ve çevrim içi kripto için bakiye yükleme yönergeleri
-- Yönetim panelinde Telegram & API anahtarlarını, ödeme yöntemlerini, kullanıcıları, ödemeleri ve servisleri görüntüleme / güncelleme
+- Telegram Stars, NowPayments (kripto ödeme), IBAN, kripto ve çevrim içi kripto için bakiye yükleme entegrasyonları
+- Yönetim panelinde Telegram & API anahtarlarını, ödeme yöntemlerini (Telegram Stars ve NowPayments dahil), kullanıcıları, ödemeleri ve servisleri görüntüleme / güncelleme
+- "Katalog Senkronizasyonu" bölümünden dilediğiniz an katalogu sağlayıcı API'lerinden yenileme
 
 ## Kurulum
 
 1. Gerekli PHP uzantılarının (curl, pdo_sqlite) aktif olduğundan emin olun.
 2. Depoyu sunucunuza kopyalayın ve proje dizinine geçin.
-3. `.env.example` dosyasını `.env` olarak kopyalayın ve Telegram bot token, admin paneli anahtarı, SMS sağlayıcı API anahtarları ve ödeme bilgilerini doldurun. `APP_NAME` değeri karşılamada gösterilecek mağaza adını belirler.
+3. `.env.example` dosyasını `.env` olarak kopyalayın ve Telegram bot token, admin paneli anahtarı, `APP_URL`, SMS sağlayıcı API anahtarları ve ödeme bilgilerini doldurun. `APP_NAME` değeri karşılamada gösterilecek mağaza adını belirler.
 4. Yazma izinleri için `storage/` klasörünü web sunucusunun yazabileceği şekilde ayarlayın. SQLite dosyası ilk çalıştırmada bu klasörde oluşturulur.
 5. Varsayılan değerler `.env` üzerinden alınır; sunucuda farklı değerler kullanmak için ortam değişkenleri de tanımlayabilirsiniz.
-6. İlk kurulumda veritabanı otomatik oluşturulur. Örnek servis ve ülke kayıtları eklemek için:
+6. İlk kurulumda veritabanı otomatik oluşturulur. Sağlayıcıdan katalog verilerini çekmek için:
 
    ```bash
    php bot/seed.php
    ```
+
+   Komut, seçtiğiniz SMS sağlayıcısından güncel servis ve ülke stoklarını alıp veritabanına işler.
 
 ## Telegram Botunu Çalıştırma
 
@@ -40,7 +43,13 @@ Bu proje, PHP 7.3 ve üzeri sürümlerde çalışacak şekilde hazırlanmış, T
 
 ## SMS Sağlayıcıları
 
-Varsayılan olarak 5Sim ve Sms-Activate desteklenir. API anahtarlarını yönetim panelinden girerek etkinleştirebilirsiniz. API anahtarı girilmemişse test amaçlı sahte numaralar döndürülür.
+Varsayılan olarak 5Sim ve Sms-Activate desteklenir. API anahtarlarını yönetim panelinden girerek etkinleştirebilirsiniz. Sağlayıcılardan gelen servisler ve ülke stokları otomatik olarak `CatalogSyncService` ile veritabanına aktarılır. API anahtarı girilmemişse test amaçlı sahte numaralar döndürülür.
+
+## Ödeme Entegrasyonları
+
+- **Telegram Stars**: Yönetim panelinden Stars paket bilgilerini girerek botun kullanıcıya Telegram ödeme bağlantısı göndermesini sağlayabilirsiniz. Token tanımlı değilse kullanıcıya manuel ödeme yönergesi gösterilir.
+- **NowPayments**: `NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET` ve ilgili para birimi/tutar ayarlarını girdikten sonra kullanıcılar otomatik fatura bağlantısı alır. Ödemenin tamamlanması için NowPayments panelinde IPN adresi olarak `https://alanadiniz.com/nowpayments_webhook.php` adresini, gizli anahtar olarak `.env` dosyasında belirttiğiniz değeri kullanın. Webhook, başarılı ödemelerde kullanıcı bakiyesini otomatik günceller.
+- **Diğer yöntemler**: IBAN, statik kripto adresi ve çevrim içi kripto sağlayıcı bilgileri manuel yönergeler olarak gönderilir.
 
 ## SMS Kodlarını Kontrol Etme
 

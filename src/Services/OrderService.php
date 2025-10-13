@@ -53,7 +53,7 @@ class OrderService
         }
 
         try {
-            $orderData = $this->provider->requestNumber((string) $serviceId, (string) $country['code']);
+            $orderData = $this->provider->requestNumber((string) $service['provider_service_id'], (string) ($country['provider_country_code'] ?: $country['provider_code'] ?: $country['code']));
         } catch (\Throwable $exception) {
             return ['message' => 'Numara alınırken hata oluştu: ' . $exception->getMessage()];
         }

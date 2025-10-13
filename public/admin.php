@@ -5,6 +5,7 @@ use App\Models\PaymentRepository;
 use App\Models\ServiceRepository;
 use App\Models\SettingRepository;
 use App\Models\UserRepository;
+use App\Services\CatalogSyncService;
 use App\Support\Config;
 
 $token = Config::get('admin.panel_token');
@@ -18,9 +19,12 @@ $settings = new SettingRepository();
 $users = new UserRepository();
 $payments = new PaymentRepository();
 $services = new ServiceRepository();
+$catalog = new CatalogSyncService();
+$noticeParam = $_GET['notice'] ?? null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $section = $_POST['section'] ?? '';
+    $redirectNotice = null;
     if ($section === 'telegram') {
         $settings->set('telegram.bot_token', $_POST['bot_token'] ?? '');
         $settings->set('telegram.admin_chat_id', $_POST['admin_chat_id'] ?? '');
@@ -39,9 +43,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $settings->set('payments.iban.holder', $_POST['iban_holder'] ?? '');
         $settings->set('payments.crypto.address', $_POST['crypto_address'] ?? '');
         $settings->set('payments.online_crypto.provider', $_POST['online_crypto_provider'] ?? '');
+        $settings->set('payments.telegram_stars.provider_token', $_POST['telegram_provider_token'] ?? '');
+        $settings->set('payments.telegram_stars.title', $_POST['telegram_stars_title'] ?? '');
+        $settings->set('payments.telegram_stars.description', $_POST['telegram_stars_description'] ?? '');
+        $package = [
+            'label' => $_POST['telegram_stars_package_label'] ?? '100 Yıldız',
+            'stars' => (int) ($_POST['telegram_stars_package_stars'] ?? 100),
+            'price' => (float) ($_POST['telegram_stars_package_price'] ?? 100),
+        ];
+        $settings->set('payments.telegram_stars.packages', json_encode([$package]));
+        $settings->set('payments.nowpayments.api_key', $_POST['nowpayments_api_key'] ?? '');
+        $settings->set('payments.nowpayments.price_currency', $_POST['nowpayments_price_currency'] ?? 'USD');
+        $settings->set('payments.nowpayments.pay_currency', $_POST['nowpayments_pay_currency'] ?? 'USDT');
+        $settings->set('payments.nowpayments.default_amount', (float) ($_POST['nowpayments_default_amount'] ?? 100));
+        $settings->set('payments.nowpayments.success_url', $_POST['nowpayments_success_url'] ?? '');
+        $settings->set('payments.nowpayments.cancel_url', $_POST['nowpayments_cancel_url'] ?? '');
+        $settings->set('payments.nowpayments.ipn_secret', $_POST['nowpayments_ipn_secret'] ?? '');
+    } elseif ($section === 'catalog') {
+        try {
+            $catalog->syncAll();
+            $redirectNotice = 'catalog_synced';
+        } catch (\Throwable $exception) {
+            $redirectNotice = 'catalog_failed';
+        }
+
+        header('Location: admin.php?token=' . urlencode($token) . ($redirectNotice ? '&notice=' . urlencode($redirectNotice) : ''));
+        exit;
     }
 
-    header('Location: admin.php?token=' . urlencode($token));
+    header('Location: admin.php?token=' . urlencode($token) . ($redirectNotice ? '&notice=' . urlencode($redirectNotice) : ''));
     exit;
 }
 
@@ -49,6 +79,7 @@ $currentConfig = Config::all();
 $allUsers = $users->all();
 $allPayments = $payments->all();
 $allServices = $services->all();
+$lastSync = Config::get('catalog.last_sync');
 ?>
 <!DOCTYPE html>
 <html lang="tr">
@@ -67,10 +98,18 @@ $allServices = $services->all();
         th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; }
         th { background: #f0f0f0; }
         .checkbox-group { display: flex; gap: 16px; flex-wrap: wrap; }
+        .notice { padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; }
+        .notice-success { background: #d1fae5; color: #065f46; }
+        .notice-error { background: #fee2e2; color: #991b1b; }
     </style>
 </head>
 <body>
 <h1>Admin Paneli</h1>
+<?php if ($noticeParam): ?>
+    <div class="notice <?= $noticeParam === 'catalog_synced' ? 'notice-success' : 'notice-error' ?>">
+        <?= $noticeParam === 'catalog_synced' ? 'Katalog başarıyla senkronize edildi.' : 'Katalog senkronizasyonu başarısız oldu.' ?>
+    </div>
+<?php endif; ?>
 <section>
     <h2>Telegram Ayarları</h2>
     <form method="post">
@@ -108,6 +147,20 @@ $allServices = $services->all();
                 <label><input type="checkbox" name="enabled[<?= $method ?>]" <?= !empty($options['enabled']) ? 'checked' : '' ?>> <?= htmlspecialchars(ucfirst(str_replace('_', ' ', $method))) ?></label>
             <?php endforeach; ?>
         </div>
+        <h3>Telegram Stars</h3>
+        <label>Sağlayıcı Token</label>
+        <input type="text" name="telegram_provider_token" value="<?= htmlspecialchars($currentConfig['payments']['telegram_stars']['provider_token'] ?? '') ?>">
+        <label>Başlık</label>
+        <input type="text" name="telegram_stars_title" value="<?= htmlspecialchars($currentConfig['payments']['telegram_stars']['title'] ?? '') ?>">
+        <label>Açıklama</label>
+        <input type="text" name="telegram_stars_description" value="<?= htmlspecialchars($currentConfig['payments']['telegram_stars']['description'] ?? '') ?>">
+        <?php $package = $currentConfig['payments']['telegram_stars']['packages'][0] ?? ['label' => '100 Yıldız', 'stars' => 100, 'price' => 100]; ?>
+        <label>Paket Etiketi</label>
+        <input type="text" name="telegram_stars_package_label" value="<?= htmlspecialchars($package['label'] ?? '') ?>">
+        <label>Yıldız Adedi</label>
+        <input type="number" name="telegram_stars_package_stars" value="<?= htmlspecialchars($package['stars'] ?? 100) ?>">
+        <label>Varsayılan Fiyat</label>
+        <input type="number" step="0.01" name="telegram_stars_package_price" value="<?= htmlspecialchars($package['price'] ?? 100) ?>">
         <label>IBAN</label>
         <input type="text" name="iban_iban" value="<?= htmlspecialchars($currentConfig['payments']['iban']['iban'] ?? '') ?>">
         <label>IBAN Hesap Sahibi</label>
@@ -116,7 +169,31 @@ $allServices = $services->all();
         <input type="text" name="crypto_address" value="<?= htmlspecialchars($currentConfig['payments']['crypto']['address'] ?? '') ?>">
         <label>Online Kripto Sağlayıcısı</label>
         <input type="text" name="online_crypto_provider" value="<?= htmlspecialchars($currentConfig['payments']['online_crypto']['provider'] ?? '') ?>">
+        <h3>NowPayments</h3>
+        <label>API Anahtarı</label>
+        <input type="text" name="nowpayments_api_key" value="<?= htmlspecialchars($currentConfig['payments']['nowpayments']['api_key'] ?? '') ?>">
+        <label>Fiyat Para Birimi</label>
+        <input type="text" name="nowpayments_price_currency" value="<?= htmlspecialchars($currentConfig['payments']['nowpayments']['price_currency'] ?? 'USD') ?>">
+        <label>Ödeme Para Birimi</label>
+        <input type="text" name="nowpayments_pay_currency" value="<?= htmlspecialchars($currentConfig['payments']['nowpayments']['pay_currency'] ?? 'USDT') ?>">
+        <label>Varsayılan Tutar</label>
+        <input type="number" step="0.01" name="nowpayments_default_amount" value="<?= htmlspecialchars($currentConfig['payments']['nowpayments']['default_amount'] ?? 100) ?>">
+        <label>Başarılı URL</label>
+        <input type="text" name="nowpayments_success_url" value="<?= htmlspecialchars($currentConfig['payments']['nowpayments']['success_url'] ?? '') ?>">
+        <label>İptal URL</label>
+        <input type="text" name="nowpayments_cancel_url" value="<?= htmlspecialchars($currentConfig['payments']['nowpayments']['cancel_url'] ?? '') ?>">
+        <label>IPN Gizli Anahtarı</label>
+        <input type="text" name="nowpayments_ipn_secret" value="<?= htmlspecialchars($currentConfig['payments']['nowpayments']['ipn_secret'] ?? '') ?>">
         <button type="submit">Kaydet</button>
+    </form>
+</section>
+
+<section>
+    <h2>Katalog Senkronizasyonu</h2>
+    <p>Son senkronizasyon: <?= $lastSync ? htmlspecialchars($lastSync) : 'Henüz senkronize edilmedi' ?></p>
+    <form method="post">
+        <input type="hidden" name="section" value="catalog">
+        <button type="submit">Sağlayıcıdan Yenile</button>
     </form>
 </section>
 
@@ -182,6 +259,7 @@ $allServices = $services->all();
             <th>ID</th>
             <th>Ad</th>
             <th>Sağlayıcı</th>
+            <th>Sağlayıcı Servis ID</th>
             <th>Taban Fiyat</th>
             <th>Popüler</th>
         </tr>
@@ -192,6 +270,7 @@ $allServices = $services->all();
                 <td><?= $service['id'] ?></td>
                 <td><?= htmlspecialchars($service['name']) ?></td>
                 <td><?= htmlspecialchars($service['provider']) ?></td>
+                <td><?= htmlspecialchars($service['provider_service_id']) ?></td>
                 <td><?= number_format((float) $service['base_price'], 2) ?>₺</td>
                 <td><?= $service['popular'] ? 'Evet' : 'Hayır' ?></td>
             </tr>

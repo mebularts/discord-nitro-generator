@@ -10,17 +10,21 @@ CREATE TABLE users (
 
 CREATE TABLE services (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider_service_id TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
     provider TEXT NOT NULL,
     base_price REAL NOT NULL,
-    popular INTEGER DEFAULT 0
+    popular INTEGER DEFAULT 0,
+    provider_category TEXT
 );
 
 CREATE TABLE countries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    provider_code TEXT UNIQUE,
+    dial_prefix TEXT
 );
 
 CREATE TABLE service_countries (
@@ -29,6 +33,7 @@ CREATE TABLE service_countries (
     country_id INTEGER NOT NULL,
     stock INTEGER DEFAULT 0,
     price REAL NOT NULL,
+    provider_country_code TEXT,
     FOREIGN KEY(service_id) REFERENCES services(id),
     FOREIGN KEY(country_id) REFERENCES countries(id),
     UNIQUE(service_id, country_id)

@@ -18,12 +18,86 @@ class SmsActivateProvider implements SmsProviderInterface
 
     public function getServices(): array
     {
-        return [];
+        if (!$this->apiKey) {
+            return [
+                [
+                    'id' => 'telegram',
+                    'name' => 'Telegram (Demo)',
+                    'price' => 1.2,
+                    'category' => 'demo',
+                    'popular' => true,
+                ],
+            ];
+        }
+
+        $params = http_build_query([
+            'api_key' => $this->apiKey,
+            'action' => 'getPrices',
+            'country' => 0,
+        ]);
+
+        $response = $this->request('/stubs/handler_api.php?' . $params);
+        $services = [];
+
+        foreach ($response as $countryCode => $serviceList) {
+            if (!is_array($serviceList)) {
+                continue;
+            }
+            foreach ($serviceList as $serviceCode => $meta) {
+                if (!isset($services[$serviceCode])) {
+                    $services[$serviceCode] = [
+                        'id' => $serviceCode,
+                        'name' => strtoupper($serviceCode),
+                        'price' => $meta['cost'] ?? 0,
+                        'category' => $meta['category'] ?? 'sms-activate',
+                        'popular' => ($meta['count'] ?? 0) > 0,
+                    ];
+                } else {
+                    $services[$serviceCode]['price'] = min($services[$serviceCode]['price'], $meta['cost'] ?? $services[$serviceCode]['price']);
+                    $services[$serviceCode]['popular'] = $services[$serviceCode]['popular'] || ($meta['count'] ?? 0) > 0;
+                }
+            }
+        }
+
+        return array_values($services);
     }
 
     public function getCountriesForService(string $serviceId): array
     {
-        return [];
+        if (!$this->apiKey) {
+            return [
+                [
+                    'provider_country_code' => '0',
+                    'name' => 'Global (Demo)',
+                    'stock' => 10,
+                    'price' => 1.2,
+                ],
+            ];
+        }
+
+        $params = http_build_query([
+            'api_key' => $this->apiKey,
+            'action' => 'getPrices',
+            'service' => $serviceId,
+        ]);
+
+        $response = $this->request('/stubs/handler_api.php?' . $params);
+        $countries = [];
+
+        foreach ($response as $countryCode => $services) {
+            if (!isset($services[$serviceId])) {
+                continue;
+            }
+            $meta = $services[$serviceId];
+            $countries[] = [
+                'provider_country_code' => (string) $countryCode,
+                'name' => $meta['country'] ?? $countryCode,
+                'stock' => (int) ($meta['count'] ?? 0),
+                'price' => (float) ($meta['cost'] ?? 0),
+            ];
+        }
+
+        return $countries;
     }
 
     public function requestNumber(string $serviceId, string $countryCode): array
