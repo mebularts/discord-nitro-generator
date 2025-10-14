@@ -59,6 +59,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $settings->set('payments.nowpayments.success_url', $_POST['nowpayments_success_url'] ?? '');
         $settings->set('payments.nowpayments.cancel_url', $_POST['nowpayments_cancel_url'] ?? '');
         $settings->set('payments.nowpayments.ipn_secret', $_POST['nowpayments_ipn_secret'] ?? '');
+    } elseif ($section === 'pricing') {
+        $settings->set('catalog.markup_percent', (float) ($_POST['markup_percent'] ?? 0));
+        $settings->set('catalog.markup_fixed', (float) ($_POST['markup_fixed'] ?? 0));
     } elseif ($section === 'catalog') {
         try {
             $catalog->syncAll();
@@ -134,6 +137,19 @@ $lastSync = Config::get('catalog.last_sync');
         <input type="password" name="fivesim_api_key" value="<?= htmlspecialchars($currentConfig['providers']['5sim']['api_key'] ?? '') ?>">
         <label>Sms-Activate API Anahtarı</label>
         <input type="password" name="sms_activate_api_key" value="<?= htmlspecialchars($currentConfig['providers']['sms_activate']['api_key'] ?? '') ?>">
+        <button type="submit">Kaydet</button>
+    </form>
+</section>
+
+<section>
+    <h2>Fiyatlandırma</h2>
+    <form method="post">
+        <input type="hidden" name="section" value="pricing">
+        <label>Komisyon Yüzdesi (%)</label>
+        <input type="number" step="0.01" name="markup_percent" value="<?= htmlspecialchars($currentConfig['catalog']['markup_percent'] ?? 0) ?>">
+        <label>Sabit Ücret (₺)</label>
+        <input type="number" step="0.01" name="markup_fixed" value="<?= htmlspecialchars($currentConfig['catalog']['markup_fixed'] ?? 0) ?>">
+        <p>Satış fiyatı = Sağlayıcı fiyatı + (Sağlayıcı fiyatı × % komisyon) + sabit ücret.</p>
         <button type="submit">Kaydet</button>
     </form>
 </section>

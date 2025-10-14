@@ -11,6 +11,7 @@ Bu proje, PHP 7.3 ve üzeri sürümlerde çalışacak şekilde hazırlanmış, T
 - Sağlayıcıdan gelen SMS kodunu kullanıcıya iletmek için kontrol betiği
 - Telegram Stars, NowPayments (kripto ödeme), IBAN, kripto ve çevrim içi kripto için bakiye yükleme entegrasyonları
 - Yönetim panelinde Telegram & API anahtarlarını, ödeme yöntemlerini (Telegram Stars ve NowPayments dahil), kullanıcıları, ödemeleri ve servisleri görüntüleme / güncelleme
+- Sağlayıcı fiyatlarına yönetim panelinden tanımlanabilen yüzde ve sabit komisyon ekleyerek satış fiyatını otomatik belirleme
 - "Katalog Senkronizasyonu" bölümünden dilediğiniz an katalogu sağlayıcı API'lerinden yenileme
 
 ## Kurulum
@@ -67,6 +68,7 @@ Kod bulunduğunda kullanıcıya Telegram üzerinden bilgilendirme mesajı gönde
 
 - Telegram bot token, admin chat ID ve webhook gizli anahtarını güncelleyin.
 - Varsayılan SMS sağlayıcısını seçip API anahtarlarını girin.
+- Komisyon yüzdesi ve sabit ücret alanlarını kullanarak satış fiyatı formülünü yapılandırın.
 - Ödeme yöntemlerini etkinleştirip gerekli hesap bilgilerini düzenleyin.
 - Kullanıcı, ödeme ve servis listelerini görüntüleyin.
 

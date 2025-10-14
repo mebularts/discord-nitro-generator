@@ -67,5 +67,7 @@ return [
     ],
     'catalog' => [
         'default_price' => (float) (getenv('CATALOG_DEFAULT_PRICE') ?: 25.0),
+        'markup_percent' => (float) (getenv('CATALOG_MARKUP_PERCENT') ?: 0),
+        'markup_fixed' => (float) (getenv('CATALOG_MARKUP_FIXED') ?: 0),
     ],
 ];

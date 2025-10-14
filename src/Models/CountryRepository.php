@@ -2,6 +2,7 @@
 namespace App\Models;
 
 use App\Support\Database;
+use App\Support\Pricing;
 use PDO;
 
 class CountryRepository
@@ -12,7 +13,15 @@ class CountryRepository
         $stmt = Database::connection()->prepare($sql);
         $stmt->execute(['service_id' => $serviceId]);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $records = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($records as &$record) {
+            $basePrice = (float) ($record['price'] ?? 0);
+            $record['provider_price'] = $basePrice;
+            $record['price'] = Pricing::applyMarkup($basePrice);
+        }
+        unset($record);
+
+        return $records;
     }
 
     public function search(string $keyword): array

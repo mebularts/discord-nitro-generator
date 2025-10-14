@@ -7,6 +7,7 @@ use App\Models\ServiceRepository;
 use App\Models\UserRepository;
 use App\Services\Sms\ProviderFactory;
 use App\Services\Sms\SmsProviderInterface;
+use App\Support\Pricing;
 
 class OrderService
 {
@@ -89,6 +90,6 @@ class OrderService
             }
         }
 
-        return $fallback;
+        return Pricing::applyMarkup((float) $fallback);
     }
 }
