@@ -225,10 +225,32 @@ function site_settings(PDO $pdo): array {
     'title'       => translation_defaults()['title'],
     'description' => translation_defaults()['subtitle'],
     'footer'      => translation_defaults()['footer.text'],
+    'meta_keywords'=> '',
   ];
   $stored = settings_get($pdo, 'site', []);
   if (!is_array($stored)) $stored = [];
   return array_merge($defaults, $stored);
+}
+
+function contact_settings(PDO $pdo): array {
+  $defaults = [
+    'phone'     => '',
+    'whatsapp'  => '',
+    'instagram' => '',
+    'facebook'  => '',
+    'twitter'   => '',
+    'tiktok'    => '',
+    'linkedin'  => '',
+  ];
+  $stored = settings_get($pdo, 'contact', []);
+  if (!is_array($stored)) $stored = [];
+  $merged = array_merge($defaults, $stored);
+  foreach ($merged as $key => $value) {
+    if (!is_string($value)) {
+      $merged[$key] = '';
+    }
+  }
+  return $merged;
 }
 
 function custom_assets(PDO $pdo): array {
@@ -255,6 +277,99 @@ function booking_settings(PDO $pdo): array {
   $merged['max_days'] = max($merged['lead_days'], (int)$merged['max_days']);
   $merged['allow_weekend'] = (int)$merged['allow_weekend'] ? 1 : 0;
   return $merged;
+}
+
+function smtp_settings(PDO $pdo): array {
+  $defaults = [
+    'enabled'   => false,
+    'host'      => '',
+    'port'      => 587,
+    'encryption'=> 'tls',
+    'username'  => '',
+    'password'  => '',
+    'from'      => 'noreply@example.com',
+    'from_name' => 'Randevu Sistemi',
+  ];
+  $stored = settings_get($pdo, 'smtp', []);
+  if (!is_array($stored)) $stored = [];
+  $stored['enabled'] = !empty($stored['enabled']);
+  $stored['port'] = isset($stored['port']) ? (int)$stored['port'] : $defaults['port'];
+  return array_merge($defaults, $stored);
+}
+
+function sms_settings(PDO $pdo): array {
+  $defaults = [
+    'provider' => 'netgsm',
+    'username' => '',
+    'password' => '',
+    'header'   => '',
+  ];
+  $stored = settings_get($pdo, 'sms', []);
+  if (!is_array($stored)) $stored = [];
+  return array_merge($defaults, $stored);
+}
+
+function notification_template_defaults(): array {
+  return [
+    'email' => [
+      'appointment_customer' => [
+        'subject' => 'Randevu Onayı #{appointment_id}',
+        'body'    => '<p>Merhaba {customer_name},</p><p>{provider_name} ile {appointment_date} tarihinde saat {appointment_time} için randevunuz oluşturuldu.</p>',
+      ],
+      'appointment_provider' => [
+        'subject' => 'Yeni Randevu #{appointment_id}',
+        'body'    => '<p>Merhaba {provider_name},</p><p>{customer_name} tarafından {appointment_date} {appointment_time} tarihinde randevu alındı.</p>',
+      ],
+      'bulk_default' => [
+        'subject' => 'Duyuru',
+        'body'    => '<p>{message}</p>',
+      ],
+    ],
+    'sms' => [
+      'appointment_customer' => 'Randevunuz {appointment_date} {appointment_time} tarihinde onaylandı.',
+      'appointment_provider' => '{customer_name}, {appointment_date} {appointment_time} için yeni randevu aldı.',
+      'bulk_default' => '{message}',
+    ],
+  ];
+}
+
+function notification_templates(PDO $pdo): array {
+  $defaults = notification_template_defaults();
+  $stored = settings_get($pdo, 'notification_templates', []);
+  if (!is_array($stored)) $stored = [];
+  return array_replace_recursive($defaults, $stored);
+}
+
+function notification_template(PDO $pdo, string $channel, string $key): array|string {
+  $templates = notification_templates($pdo);
+  return $templates[$channel][$key] ?? ($channel === 'email' ? ['subject' => '', 'body' => ''] : '');
+}
+
+function format_notification(string $content, array $context): string {
+  $replacements = [];
+  foreach ($context as $key => $value) {
+    $replacements['{'.$key.'}'] = (string)$value;
+  }
+  return strtr($content, $replacements);
+}
+
+function customer_history(PDO $pdo, string $customerKey): array {
+  $stmt = q(
+    $pdo,
+    'SELECT a.*, p.name AS provider_name FROM appointments a LEFT JOIN providers p ON p.id = a.provider_id WHERE (COALESCE(NULLIF(a.email, ""), a.phone) = ?) ORDER BY a.app_date DESC, a.app_time DESC, a.id DESC LIMIT 200',
+    [$customerKey]
+  );
+  return $stmt->fetchAll();
+}
+
+function latest_customer_appointment(PDO $pdo, string $customerKey): ?array {
+  $stmt = q(
+    $pdo,
+    'SELECT a.*, p.name AS provider_name FROM appointments a LEFT JOIN providers p ON p.id = a.provider_id WHERE (COALESCE(NULLIF(a.email, ""), a.phone) = ?) ORDER BY a.app_date DESC, a.id DESC LIMIT 1',
+    [$customerKey]
+  );
+  $row = $stmt->fetch();
+  return $row ?: null;
 }
 
 function provider_default_duration(PDO $pdo, int $providerId): int {
@@ -337,6 +452,7 @@ function permission_labels(): array {
     'customers'    => 'Müşteriler',
     'providers'    => 'Randevu Verenler',
     'availability' => 'Müsaitlik Yönetimi',
+    'notifications'=> 'Bildirimler',
     'settings'     => 'Site Ayarları',
     'languages'    => 'Dil Yönetimi',
     'translations' => 'Çeviriler',

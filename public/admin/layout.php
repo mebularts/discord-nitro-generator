@@ -7,6 +7,7 @@ function admin_nav_items(): array {
     ['id' => 'appointments', 'label' => 'Randevular',      'href' => '/admin/appointments.php','permission' => 'appointments'],
     ['id' => 'customers',    'label' => 'Müşteriler',      'href' => '/admin/customers.php',   'permission' => 'customers'],
     ['id' => 'providers',    'label' => 'Randevu Verenler','href' => '/admin/providers.php',   'permission' => 'providers'],
+    ['id' => 'notifications','label' => 'Bildirimler',     'href' => '/admin/notifications.php','permission' => 'notifications'],
     ['id' => 'settings',     'label' => 'Site Ayarları',   'href' => '/admin/settings.php',    'permission' => 'settings'],
     ['id' => 'languages',    'label' => 'Dil Yönetimi',    'href' => '/admin/languages.php',   'permission' => 'languages'],
     ['id' => 'translations', 'label' => 'Çeviri Metinleri','href' => '/admin/translations.php','permission' => 'translations'],

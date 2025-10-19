@@ -120,7 +120,11 @@ admin_render_header('Müşteriler', 'customers');
     <tbody>
     <?php foreach ($customers as $customer): ?>
       <tr class="border-t">
-        <td class="px-4 py-3 text-slate-700"><?= h($customer['full_name']) ?></td>
+        <td class="px-4 py-3 text-slate-700">
+          <a href="/admin/customer.php?key=<?= urlencode($customer['customer_key']) ?>" class="text-slate-800 hover:text-slate-500 font-medium">
+            <?= h($customer['full_name']) ?>
+          </a>
+        </td>
         <td class="px-4 py-3 text-slate-600">
           <?= h($customer['phone']) ?><br>
           <?php if (!empty($customer['email'])): ?><?= h($customer['email']) ?><?php endif; ?>

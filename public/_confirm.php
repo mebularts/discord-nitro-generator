@@ -1,7 +1,8 @@
 <?php
 if (empty($_SESSION['book']['time'])) redirect('/?p=time');
 $b = $_SESSION['book'];
-$provider = q($pdo, 'SELECT name FROM providers WHERE id=?', [$b['pid']])->fetchColumn();
+$providerRow = q($pdo, 'SELECT name,email,phone FROM providers WHERE id=?', [$b['pid']])->fetch();
+$providerName = $providerRow['name'] ?? '';
 $duration = provider_default_duration($pdo, (int)$b['pid']);
 $langCode = current_language_code($pdo);
 
@@ -26,13 +27,56 @@ if (is_post()) {
   $_SESSION['last_id'] = $appId;
   $_SESSION['book'] = [];
   if (!empty($b['email'])) {
-    $subject = t('confirm.title').' #'.$appId;
-    $body    = '<p>'.h(t('confirm.date')).': '.date('d.m.Y', strtotime($b['date'])).' '.$b['time'].'</p>';
+    $context = [
+      'appointment_id'   => $appId,
+      'customer_name'    => $b['full_name'],
+      'provider_name'    => $providerName,
+      'appointment_date' => date('d.m.Y', strtotime($b['date'])),
+      'appointment_time' => $b['time'],
+      'message'          => '',
+    ];
+    $tpl = notification_template($pdo, 'email', 'appointment_customer');
+    $subject = format_notification($tpl['subject'] ?? 'Randevu Onayı', $context);
+    $body    = format_notification($tpl['body'] ?? '', $context);
     send_email($pdo, $b['email'], $subject, $body);
   }
   if (!empty($b['phone'])) {
-    $msg = t('confirm.date').': '.date('d.m.Y', strtotime($b['date'])).' '.$b['time'];
-    send_sms($pdo, $b['phone'], $msg);
+    $context = [
+      'appointment_id'   => $appId,
+      'customer_name'    => $b['full_name'],
+      'provider_name'    => $providerName,
+      'appointment_date' => date('d.m.Y', strtotime($b['date'])),
+      'appointment_time' => $b['time'],
+      'message'          => '',
+    ];
+    $msg = notification_template($pdo, 'sms', 'appointment_customer');
+    send_sms($pdo, $b['phone'], format_notification($msg, $context));
+  }
+  if (!empty($providerRow['email'])) {
+    $context = [
+      'appointment_id'   => $appId,
+      'customer_name'    => $b['full_name'],
+      'provider_name'    => $providerName,
+      'appointment_date' => date('d.m.Y', strtotime($b['date'])),
+      'appointment_time' => $b['time'],
+      'message'          => '',
+    ];
+    $tpl = notification_template($pdo, 'email', 'appointment_provider');
+    $subject = format_notification($tpl['subject'] ?? 'Yeni Randevu', $context);
+    $body    = format_notification($tpl['body'] ?? '', $context);
+    send_email($pdo, $providerRow['email'], $subject, $body);
+  }
+  if (!empty($providerRow['phone'])) {
+    $context = [
+      'appointment_id'   => $appId,
+      'customer_name'    => $b['full_name'],
+      'provider_name'    => $providerName,
+      'appointment_date' => date('d.m.Y', strtotime($b['date'])),
+      'appointment_time' => $b['time'],
+      'message'          => '',
+    ];
+    $tpl = notification_template($pdo, 'sms', 'appointment_provider');
+    send_sms($pdo, $providerRow['phone'], format_notification($tpl, $context));
   }
   redirect('/?p=done');
 }
@@ -45,7 +89,7 @@ if (is_post()) {
   <div class="grid md:grid-cols-3 gap-4 text-center">
     <div class="bg-slate-50 rounded-xl p-6 border">
       <div class="text-sm text-slate-500"><?= h(t('confirm.provider')) ?></div>
-      <div class="text-xl font-semibold text-slate-800"><?= h($provider) ?></div>
+      <div class="text-xl font-semibold text-slate-800"><?= h($providerName) ?></div>
     </div>
     <div class="bg-slate-50 rounded-xl p-6 border">
       <div class="text-sm text-slate-500"><?= h(t('confirm.date')) ?></div>

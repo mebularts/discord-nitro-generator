@@ -20,13 +20,15 @@ if (is_post()) {
     $primary = trim($_POST['primary_color'] ?? '#0284c7');
     $secondary = trim($_POST['secondary_color'] ?? '#4f46e5');
     $duration = max(5, (int)($_POST['default_duration'] ?? 30));
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
     if ($name === '') {
       set_flash('error', 'İsim zorunludur.');
     } else {
       if ($id > 0) {
-        q($pdo, 'UPDATE providers SET name=?, bio=?, active=?, sort=?, primary_color=?, secondary_color=?, default_duration=? WHERE id=?', [$name, $bio !== '' ? $bio : null, $active, $sort, $primary, $secondary, $duration, $id]);
+        q($pdo, 'UPDATE providers SET name=?, bio=?, active=?, sort=?, primary_color=?, secondary_color=?, default_duration=?, email=?, phone=? WHERE id=?', [$name, $bio !== '' ? $bio : null, $active, $sort, $primary, $secondary, $duration, $email !== '' ? $email : null, $phone !== '' ? $phone : null, $id]);
       } else {
-        q($pdo, 'INSERT INTO providers (name, bio, active, sort, primary_color, secondary_color, default_duration) VALUES (?,?,?,?,?,?,?)', [$name, $bio !== '' ? $bio : null, $active, $sort, $primary, $secondary, $duration]);
+        q($pdo, 'INSERT INTO providers (name, bio, active, sort, primary_color, secondary_color, default_duration, email, phone) VALUES (?,?,?,?,?,?,?,?,?)', [$name, $bio !== '' ? $bio : null, $active, $sort, $primary, $secondary, $duration, $email !== '' ? $email : null, $phone !== '' ? $phone : null]);
         $id = (int)$pdo->lastInsertId();
       }
       if (!empty($_FILES['image']['tmp_name'])) {
@@ -134,6 +136,12 @@ admin_render_header('Randevu Verenler', 'providers');
           <label class="text-sm text-slate-600">Sıralama
             <input type="number" name="sort" value="<?= h((string)($selected['sort'] ?? 0)) ?>" class="mt-1 border rounded-lg w-full p-2">
           </label>
+          <label class="text-sm text-slate-600">E-posta
+            <input type="email" name="email" value="<?= h($selected['email'] ?? '') ?>" class="mt-1 border rounded-lg w-full p-2">
+          </label>
+          <label class="text-sm text-slate-600">Telefon
+            <input type="text" name="phone" value="<?= h($selected['phone'] ?? '') ?>" class="mt-1 border rounded-lg w-full p-2">
+          </label>
           <label class="text-sm text-slate-600">Varsayılan Süre (dk)
             <input type="number" name="default_duration" value="<?= h((string)($selected['default_duration'] ?? 30)) ?>" class="mt-1 border rounded-lg w-full p-2">
           </label>
@@ -154,7 +162,7 @@ admin_render_header('Randevu Verenler', 'providers');
           </label>
           <?php if (!empty($selected['image'])): ?>
             <div class="md:col-span-2">
-              <img src="/uploads/providers/<?= h($selected['image']) ?>" alt="" class="w-32 h-32 object-cover rounded-lg border">
+              <img src="/uploads/providers/<?= h($selected['image']) ?>" alt="" loading="lazy" decoding="async" class="w-32 h-32 object-cover rounded-lg border">
             </div>
           <?php endif; ?>
           <div class="md:col-span-2">

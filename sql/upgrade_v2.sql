@@ -41,6 +41,9 @@ ALTER TABLE providers
   ADD COLUMN IF NOT EXISTS secondary_color VARCHAR(20) DEFAULT '#4f46e5',
   ADD COLUMN IF NOT EXISTS default_duration INT NOT NULL DEFAULT 30;
 
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS email VARCHAR(120) NULL;
+ALTER TABLE providers ADD COLUMN IF NOT EXISTS phone VARCHAR(40) NULL;
+
 CREATE TABLE IF NOT EXISTS provider_availability (
   id INT AUTO_INCREMENT PRIMARY KEY,
   provider_id INT NOT NULL,
@@ -69,12 +72,16 @@ ALTER TABLE appointments
   ADD COLUMN IF NOT EXISTS lang_code VARCHAR(10) NULL,
   ADD COLUMN IF NOT EXISTS admin_note TEXT NULL;
 
-INSERT IGNORE INTO admin_roles (id, name, permissions) VALUES (1, 'Tam Yetki', JSON_ARRAY('dashboard','appointments','customers','providers','availability','settings','languages','translations','users'));
+INSERT IGNORE INTO admin_roles (id, name, permissions) VALUES (1, 'Tam Yetki', JSON_ARRAY('dashboard','appointments','customers','providers','availability','notifications','settings','languages','translations','users'));
 INSERT IGNORE INTO admin_users (username, full_name, password, role_id, is_active, is_super) VALUES ('admin', 'Yönetici', '$2y$10$wT7aCbtm1qFq6l5t6SgPTO1w1b8r3qPZ6e3dA2pS7Zp2q9D0eN0XG', NULL, 1, 1);
 INSERT IGNORE INTO languages (id, code, name, is_default) VALUES (1, 'tr', 'Türkçe', 1);
 
 INSERT IGNORE INTO settings (`key`,`value`) VALUES
- ('site', '{"title":"Randevu Sistemi","description":"Modern, hızlı ve mobil uyumlu.","footer":"© 2025 v2.0"}'),
+ ('site', '{"title":"Randevu Sistemi","description":"Modern, hızlı ve mobil uyumlu.","footer":"© 2025 v2.0","meta_keywords":"randevu, danışmanlık"}'),
+ ('contact', '{"phone":"","whatsapp":"","instagram":"","facebook":"","twitter":"","tiktok":"","linkedin":""}'),
  ('theme', '{"primary":"#0284c7","secondary":"#4f46e5","surface":"#ffffff","background":"#f8fafc","text":"#0f172a"}'),
  ('booking', '{"slot_minutes":30,"day_start":"09:00","day_end":"18:00","lead_days":0,"max_days":60,"allow_weekend":0}'),
- ('custom_assets', '{"css":"","js":""}');
+ ('custom_assets', '{"css":"","js":""}'),
+ ('smtp', '{"enabled":0,"host":"","port":587,"encryption":"tls","username":"","password":"","from":"noreply@example.com","from_name":"Randevu Sistemi"}'),
+ ('sms', '{"provider":"netgsm","username":"","password":"","header":""}'),
+ ('notification_templates', '{"email":{"appointment_customer":{"subject":"Randevu Onayı #{appointment_id}","body":"<p>Merhaba {customer_name},</p><p>{provider_name} ile {appointment_date} tarihinde saat {appointment_time} için randevunuz oluşturuldu.</p>"},"appointment_provider":{"subject":"Yeni Randevu #{appointment_id}","body":"<p>Merhaba {provider_name},</p><p>{customer_name} tarafından {appointment_date} {appointment_time} tarihinde randevu alındı.</p>"},"bulk_default":{"subject":"Duyuru","body":"<p>{message}</p>"}},"sms":{"appointment_customer":"Randevunuz {appointment_date} {appointment_time} tarihinde onaylandı.","appointment_provider":"{customer_name}, {appointment_date} {appointment_time} için yeni randevu aldı.","bulk_default":"{message}"}}');

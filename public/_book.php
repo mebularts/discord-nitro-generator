@@ -23,7 +23,7 @@ $g    = $_SESSION['book']['gender'] ?? '';
 ?>
 <div class="p-6">
   <div class="flex items-center gap-4 mb-6">
-    <img src="<?= $img ?>" class="w-16 h-16 rounded-xl object-cover border border-slate-200" alt="<?= h($prov['name'] ?? '') ?>">
+    <img src="<?= $img ?>" class="w-16 h-16 rounded-xl object-cover border border-slate-200" loading="lazy" decoding="async" alt="<?= h($prov['name'] ?? '') ?>">
     <div>
       <div class="text-sm text-slate-500 uppercase tracking-wide"><?= h(t('book.provider')) ?></div>
       <div class="text-lg font-semibold text-slate-800"><?= h($prov['name'] ?? '') ?></div>

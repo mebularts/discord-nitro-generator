@@ -44,7 +44,9 @@ CREATE TABLE IF NOT EXISTS providers (
   image VARCHAR(255) NULL,
   primary_color VARCHAR(20) DEFAULT '#0284c7',
   secondary_color VARCHAR(20) DEFAULT '#4f46e5',
-  default_duration INT NOT NULL DEFAULT 30
+  default_duration INT NOT NULL DEFAULT 30,
+  email VARCHAR(120) NULL,
+  phone VARCHAR(40) NULL
 );
 
 CREATE TABLE IF NOT EXISTS provider_availability (
@@ -97,14 +99,14 @@ CREATE TABLE IF NOT EXISTS settings (
   `value` TEXT NOT NULL
 );
 
-INSERT IGNORE INTO admin_roles (id, name, permissions) VALUES (1, 'Tam Yetki', JSON_ARRAY('dashboard','appointments','customers','providers','availability','settings','languages','translations','users'));
+INSERT IGNORE INTO admin_roles (id, name, permissions) VALUES (1, 'Tam Yetki', JSON_ARRAY('dashboard','appointments','customers','providers','availability','notifications','settings','languages','translations','users'));
 INSERT IGNORE INTO admin_users (username, full_name, password, role_id, is_active, is_super) VALUES ('admin', 'Yönetici', '$2y$10$wT7aCbtm1qFq6l5t6SgPTO1w1b8r3qPZ6e3dA2pS7Zp2q9D0eN0XG', NULL, 1, 1);
 INSERT IGNORE INTO languages (id, code, name, is_default) VALUES (1, 'tr', 'Türkçe', 1);
 
-INSERT IGNORE INTO providers (id, name, bio, active, sort, primary_color, secondary_color, default_duration) VALUES
- (1, 'Ahmet Demircan', 'Genel danışman', 1, 1, '#0284c7', '#4f46e5', 30),
- (2, 'Hafzullah YILDIRIM', 'Kıdemli uzman', 1, 2, '#0284c7', '#4f46e5', 30),
- (3, 'Mustafa DÜNDAR', 'Uzman danışman', 1, 3, '#0284c7', '#4f46e5', 30);
+INSERT IGNORE INTO providers (id, name, bio, active, sort, primary_color, secondary_color, default_duration, email, phone) VALUES
+ (1, 'Ahmet Demircan', 'Genel danışman', 1, 1, '#0284c7', '#4f46e5', 30, 'ahmet@example.com', '05550000001'),
+ (2, 'Hafzullah YILDIRIM', 'Kıdemli uzman', 1, 2, '#0284c7', '#4f46e5', 30, 'hafzullah@example.com', '05550000002'),
+ (3, 'Mustafa DÜNDAR', 'Uzman danışman', 1, 3, '#0284c7', '#4f46e5', 30, 'mustafa@example.com', '05550000003');
 
 INSERT IGNORE INTO provider_availability (provider_id, weekday, start_time, end_time, slot_minutes) VALUES
  (1,1,'09:00','18:00',30),(1,2,'09:00','18:00',30),(1,3,'09:00','18:00',30),(1,4,'09:00','18:00',30),(1,5,'09:00','18:00',30),
@@ -112,10 +114,14 @@ INSERT IGNORE INTO provider_availability (provider_id, weekday, start_time, end_
  (3,1,'09:00','18:00',30),(3,2,'09:00','18:00',30),(3,3,'09:00','18:00',30),(3,4,'09:00','18:00',30),(3,5,'09:00','18:00',30);
 
 INSERT IGNORE INTO settings (`key`,`value`) VALUES
- ('site', '{"title":"Randevu Sistemi","description":"Modern, hızlı ve mobil uyumlu.","footer":"© 2025 v2.0"}'),
+ ('site', '{"title":"Randevu Sistemi","description":"Modern, hızlı ve mobil uyumlu.","footer":"© 2025 v2.0","meta_keywords":"randevu, danışmanlık"}'),
+ ('contact', '{"phone":"05550000000","whatsapp":"5550000000","instagram":"randevu","facebook":"randevusistemi","twitter":"randevusistemi","tiktok":"randevu","linkedin":"randevu"}'),
  ('theme', '{"primary":"#0284c7","secondary":"#4f46e5","surface":"#ffffff","background":"#f8fafc","text":"#0f172a"}'),
  ('booking', '{"slot_minutes":30,"day_start":"09:00","day_end":"18:00","lead_days":0,"max_days":60,"allow_weekend":0}'),
- ('custom_assets', '{"css":"","js":""}');
+ ('custom_assets', '{"css":"","js":""}'),
+ ('smtp', '{"enabled":0,"host":"","port":587,"encryption":"tls","username":"","password":"","from":"noreply@example.com","from_name":"Randevu Sistemi"}'),
+ ('sms', '{"provider":"netgsm","username":"","password":"","header":""}'),
+ ('notification_templates', '{"email":{"appointment_customer":{"subject":"Randevu Onayı #{appointment_id}","body":"<p>Merhaba {customer_name},</p><p>{provider_name} ile {appointment_date} tarihinde saat {appointment_time} için randevunuz oluşturuldu.</p>"},"appointment_provider":{"subject":"Yeni Randevu #{appointment_id}","body":"<p>Merhaba {provider_name},</p><p>{customer_name} tarafından {appointment_date} {appointment_time} tarihinde randevu alındı.</p>"},"bulk_default":{"subject":"Duyuru","body":"<p>{message}</p>"}},"sms":{"appointment_customer":"Randevunuz {appointment_date} {appointment_time} tarihinde onaylandı.","appointment_provider":"{customer_name}, {appointment_date} {appointment_time} için yeni randevu aldı.","bulk_default":"{message}"}}');
 
 INSERT IGNORE INTO translations (lang_id, `key`, `value`) VALUES
  (1,'title','Randevu Sistemi'),

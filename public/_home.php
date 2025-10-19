@@ -9,7 +9,7 @@
   ?>
     <div class="rounded-2xl border shadow-sm overflow-hidden group theme-surface">
       <div class="h-40 w-full overflow-hidden relative">
-        <img src="<?= $img ?>" alt="<?= h($r['name']) ?>" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+        <img src="<?= $img ?>" alt="<?= h($r['name']) ?>" loading="lazy" decoding="async" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
         <?php if($gradient): ?><div class="absolute inset-x-0 bottom-0 h-12 opacity-70" style="<?= $gradient ?>"></div><?php endif; ?>
       </div>
       <div class="p-4 space-y-3">
