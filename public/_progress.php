@@ -1,10 +1,10 @@
 <?php
 // public/_progress.php — Modern, ikonlu progress
 $steps = [
-  'book'    => ['label' => 'Genel bilgiler',   'icon' => 'user'],
-  'date'    => ['label' => 'Randevu tarihi',   'icon' => 'calendar'],
-  'time'    => ['label' => 'Randevu saati',    'icon' => 'clock'],
-  'confirm' => ['label' => 'Onay',             'icon' => 'checkdoc'],
+  'book'    => ['label' => t('progress.book'),    'icon' => 'user'],
+  'date'    => ['label' => t('progress.date'),    'icon' => 'calendar'],
+  'time'    => ['label' => t('progress.time'),    'icon' => 'clock'],
+  'confirm' => ['label' => t('progress.confirm'), 'icon' => 'checkdoc'],
 ];
 $order  = array_keys($steps);
 $curr   = $_GET['p'] ?? 'book';
@@ -54,9 +54,9 @@ $progress = (($index) / max(1, $total-1)) * 100; // 0..100
         <?= ico($steps[$k]['icon']) ?>
       </div>
       <div class="mt-2 text-[12px] text-center leading-tight <?= $label ?>"><?= h($steps[$k]['label']) ?></div>
-      <div class="mt-0.5 text-[10px] <?= $state==='done'?'text-sky-600':'text-transparent' ?>">Tamamlandı</div>
+      <div class="mt-0.5 text-[10px] <?= $state==='done'?'text-sky-600':'text-transparent' ?>"><?= h(t('progress.completed')) ?></div>
       <?php if($state==='current'): ?>
-        <div class="mt-0.5 inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px]">Buradasınız</div>
+        <div class="mt-0.5 inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px]"><?= h(t('progress.here')) ?></div>
       <?php endif; ?>
     </div>
     <?php endforeach; ?>

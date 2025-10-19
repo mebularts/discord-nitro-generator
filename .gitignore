@@ -1,0 +1,8 @@
+/vendor/
+/public/uploads/*
+!/public/uploads/.gitkeep
+/storage/cache/
+/storage/logs/
+/storage/tmp/
+.DS_Store
+/node_modules/
