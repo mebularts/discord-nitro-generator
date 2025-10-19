@@ -86,10 +86,13 @@ CREATE TABLE IF NOT EXISTS appointments (
   category VARCHAR(50) NULL,
   lang_code VARCHAR(10) NULL,
   admin_note TEXT NULL,
+  client_ip VARCHAR(45) NULL,
+  customer_fingerprint CHAR(40) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   reminder_sent TINYINT(1) NOT NULL DEFAULT 0,
   CONSTRAINT fk_appt_provider FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE,
-  INDEX idx_provider_date (provider_id, app_date)
+  INDEX idx_provider_date (provider_id, app_date),
+  INDEX idx_app_fingerprint (client_ip, customer_fingerprint)
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -125,11 +128,12 @@ INSERT INTO settings (`key`,`value`) VALUES
 ('site', '{"title":"Randevu Sistemi","description":"Modern, hızlı ve mobil uyumlu.","footer":"© 2025 v2.0"}'),
 ('theme', '{"primary":"#0284c7","secondary":"#4f46e5","surface":"#ffffff","background":"#f8fafc","text":"#0f172a"}'),
 ('booking', '{"slot_minutes":30,"day_start":"09:00","day_end":"18:00","lead_days":0,"max_days":60,"allow_weekend":0}'),
-('custom_assets', '{"css":"","js":""}')
+('custom_assets', '{"css":"","js":""}'),
+('recaptcha', '{"enabled":0,"site_key":"","secret_key":""}')
 ON DUPLICATE KEY UPDATE `value`=VALUES(`value`);
 
-INSERT INTO appointments (id, provider_id, full_name, gender, birth, phone, email, note, app_date, app_time, duration_minutes, status, category, lang_code, created_at, reminder_sent) VALUES
-(1, 1, 'Mehmet Bulat', 'Erkek', '1990-05-10', '+905000000000', 'admin@admin.com', 'Test notu', '2025-10-14', '13:00', 30, 'new', NULL, 'tr', NOW(), 0)
+INSERT INTO appointments (id, provider_id, full_name, gender, birth, phone, email, note, app_date, app_time, duration_minutes, status, category, lang_code, client_ip, customer_fingerprint, created_at, reminder_sent) VALUES
+(1, 1, 'Mehmet Bulat', 'Erkek', '1990-05-10', '+905000000000', 'admin@admin.com', 'Test notu', '2025-10-14', '13:00', 30, 'new', NULL, 'tr', '127.0.0.1', '0000000000000000000000000000000000000000', NOW(), 0)
 ON DUPLICATE KEY UPDATE full_name=VALUES(full_name);
 
 INSERT INTO translations (lang_id, `key`, `value`) VALUES

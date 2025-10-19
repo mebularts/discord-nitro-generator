@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../config/db.php';
 
+$_settings_cache = $_settings_cache ?? [];
+
 function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 function redirect(string $u){ header('Location: '.$u); exit; }
 function is_post(): bool { return ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'; }
@@ -30,17 +32,33 @@ function get_flash(string $key){ $value = $_SESSION['_flash'][$key] ?? null; uns
 function q(PDO $pdo, string $sql, array $args = []){ $stmt = $pdo->prepare($sql); $stmt->execute($args); return $stmt; }
 
 function settings_get(PDO $pdo, string $key, $default = null){
+  global $_settings_cache;
+  if (!isset($_settings_cache)) {
+    $_settings_cache = [];
+  }
+  if (array_key_exists($key, $_settings_cache)) {
+    return $_settings_cache[$key];
+  }
   $stmt = $pdo->prepare('SELECT `value` FROM settings WHERE `key` = ?');
   $stmt->execute([$key]);
   $value = $stmt->fetchColumn();
-  if ($value === false) return $default;
+  if ($value === false) {
+    $_settings_cache[$key] = $default;
+    return $default;
+  }
   $decoded = json_decode((string)$value, true);
-  return $decoded === null && json_last_error() !== JSON_ERROR_NONE ? $value : $decoded;
+  $_settings_cache[$key] = $decoded === null && json_last_error() !== JSON_ERROR_NONE ? $value : $decoded;
+  return $_settings_cache[$key];
 }
 
 function settings_set(PDO $pdo, string $key, $value): void {
   $stored = (is_array($value) || is_object($value)) ? json_encode($value, JSON_UNESCAPED_UNICODE) : (string)$value;
   $pdo->prepare('INSERT INTO settings(`key`,`value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)')->execute([$key, $stored]);
+  global $_settings_cache;
+  if (!isset($_settings_cache)) {
+    $_settings_cache = [];
+  }
+  $_settings_cache[$key] = $value;
 }
 
 function translation_defaults(): array {
@@ -253,6 +271,20 @@ function contact_settings(PDO $pdo): array {
   return $merged;
 }
 
+function recaptcha_settings(PDO $pdo): array {
+  $defaults = [
+    'enabled'    => false,
+    'site_key'   => '',
+    'secret_key' => '',
+  ];
+  $stored = settings_get($pdo, 'recaptcha', []);
+  if (!is_array($stored)) $stored = [];
+  $stored['enabled'] = !empty($stored['enabled']);
+  $stored['site_key'] = trim((string)($stored['site_key'] ?? ''));
+  $stored['secret_key'] = trim((string)($stored['secret_key'] ?? ''));
+  return array_merge($defaults, $stored);
+}
+
 function custom_assets(PDO $pdo): array {
   $defaults = ['css' => '', 'js' => ''];
   $stored = settings_get($pdo, 'custom_assets', []);
@@ -362,6 +394,83 @@ function customer_history(PDO $pdo, string $customerKey): array {
   return $stmt->fetchAll();
 }
 
+function request_ip(): string {
+  $candidates = [
+    $_SERVER['HTTP_CF_CONNECTING_IP'] ?? null,
+    $_SERVER['HTTP_X_FORWARDED_FOR'] ?? null,
+    $_SERVER['REMOTE_ADDR'] ?? null,
+  ];
+  foreach ($candidates as $candidate) {
+    if (!$candidate) continue;
+    $ipList = explode(',', $candidate);
+    foreach ($ipList as $ip) {
+      $ip = trim($ip);
+      if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
+        return $ip;
+      }
+    }
+  }
+  return '0.0.0.0';
+}
+
+function normalize_phone(string $phone): string {
+  return preg_replace('/[^0-9+]/', '', $phone);
+}
+
+function customer_fingerprint(string $fullName, string $birth, string $phone, string $email): string {
+  $parts = [
+    mb_strtolower(trim($fullName), 'UTF-8'),
+    preg_replace('/[^0-9]/', '', $birth),
+    preg_replace('/[^0-9]/', '', $phone),
+    mb_strtolower(trim($email), 'UTF-8'),
+  ];
+  return sha1(implode('|', $parts));
+}
+
+function duplicate_appointment_exists(PDO $pdo, string $ip, string $fingerprint): ?array {
+  if (!$ip || !$fingerprint) {
+    return null;
+  }
+  $stmt = q(
+    $pdo,
+    'SELECT a.id, a.app_date, a.app_time, p.name AS provider_name FROM appointments a LEFT JOIN providers p ON p.id = a.provider_id WHERE a.client_ip = ? AND a.customer_fingerprint = ? AND a.status <> "cancelled" AND a.app_date >= CURDATE() ORDER BY a.app_date ASC, a.app_time ASC, a.id ASC LIMIT 1',
+    [$ip, $fingerprint]
+  );
+  $row = $stmt->fetch();
+  return $row ?: null;
+}
+
+function verify_recaptcha(PDO $pdo, string $token, ?string $ip = null): bool {
+  $settings = recaptcha_settings($pdo);
+  if (empty($settings['enabled']) || empty($settings['secret_key'])) {
+    return true;
+  }
+  $token = trim($token);
+  if ($token === '') {
+    return false;
+  }
+  $ip = $ip ?: request_ip();
+  $payload = http_build_query([
+    'secret'   => $settings['secret_key'],
+    'response' => $token,
+    'remoteip' => $ip,
+  ]);
+  $context = stream_context_create([
+    'http' => [
+      'method'  => 'POST',
+      'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
+      'content' => $payload,
+      'timeout' => 10,
+    ],
+  ]);
+  $response = @file_get_contents('https://www.google.com/recaptcha/api/siteverify', false, $context);
+  if ($response === false) {
+    return false;
+  }
+  $data = json_decode($response, true);
+  return !empty($data['success']);
+}
+
 function latest_customer_appointment(PDO $pdo, string $customerKey): ?array {
   $stmt = q(
     $pdo,
@@ -378,12 +487,45 @@ function provider_default_duration(PDO $pdo, int $providerId): int {
 }
 
 function provider_availability_for_day(PDO $pdo, int $providerId, int $weekday): ?array {
+  static $cache = [];
+  $key = $providerId.'-'.$weekday;
+  if (array_key_exists($key, $cache)) {
+    return $cache[$key];
+  }
   $row = q($pdo, 'SELECT * FROM provider_availability WHERE provider_id=? AND weekday=? LIMIT 1', [$providerId, $weekday])->fetch();
-  return $row ?: null;
+  $cache[$key] = $row ?: null;
+  return $cache[$key];
 }
 
 function provider_timeoffs_for_date(PDO $pdo, int $providerId, string $date): array {
-  return q($pdo, 'SELECT start_time,end_time FROM provider_timeoffs WHERE provider_id=? AND (date=? OR (is_recurring=1 AND weekday=?))', [$providerId, $date, (int)date('N', strtotime($date))])->fetchAll();
+  static $cache = [];
+  $monthKey = $providerId.'-'.date('Y-m', strtotime($date));
+  if (!isset($cache[$monthKey])) {
+    $start = date('Y-m-01', strtotime($date));
+    $end   = date('Y-m-t', strtotime($date));
+    $rows = q(
+      $pdo,
+      'SELECT date,start_time,end_time,is_recurring,weekday FROM provider_timeoffs WHERE provider_id=? AND (date BETWEEN ? AND ? OR is_recurring=1)',
+      [$providerId, $start, $end]
+    )->fetchAll();
+    $indexed = ['recurring' => []];
+    foreach ($rows as $row) {
+      if (!empty($row['is_recurring'])) {
+        $indexed['recurring'][] = $row;
+      } elseif (!empty($row['date'])) {
+        $indexed[$row['date']][] = $row;
+      }
+    }
+    $cache[$monthKey] = $indexed;
+  }
+  $day = $cache[$monthKey][$date] ?? [];
+  $weekday = (int)date('N', strtotime($date));
+  foreach ($cache[$monthKey]['recurring'] ?? [] as $row) {
+    if ((int)$row['weekday'] === $weekday) {
+      $day[] = $row;
+    }
+  }
+  return $day;
 }
 
 function provider_slots_for_date(PDO $pdo, int $providerId, string $date): array {
@@ -415,7 +557,23 @@ function provider_slots_for_date(PDO $pdo, int $providerId, string $date): array
     return true;
   }));
 
-  $busy = q($pdo, 'SELECT app_time FROM appointments WHERE provider_id=? AND app_date=? AND status <> "cancelled"', [$providerId, $date])->fetchAll(PDO::FETCH_COLUMN);
+  static $busyCache = [];
+  $monthKey = $providerId.'-'.date('Y-m', strtotime($date));
+  if (!isset($busyCache[$monthKey])) {
+    $start = date('Y-m-01', strtotime($date));
+    $end   = date('Y-m-t', strtotime($date));
+    $rows = q(
+      $pdo,
+      'SELECT app_date, app_time FROM appointments WHERE provider_id=? AND app_date BETWEEN ? AND ? AND status <> "cancelled"',
+      [$providerId, $start, $end]
+    )->fetchAll();
+    $map = [];
+    foreach ($rows as $row) {
+      $map[$row['app_date']][] = $row['app_time'];
+    }
+    $busyCache[$monthKey] = $map;
+  }
+  $busy = $busyCache[$monthKey][$date] ?? [];
   if ($busy) {
     $slots = array_values(array_diff($slots, $busy));
   }

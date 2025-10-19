@@ -87,11 +87,14 @@ CREATE TABLE IF NOT EXISTS appointments (
   category VARCHAR(50) NULL,
   lang_code VARCHAR(10) NULL,
   admin_note TEXT NULL,
+  client_ip VARCHAR(45) NULL,
+  customer_fingerprint CHAR(40) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   reminder_sent TINYINT(1) NOT NULL DEFAULT 0,
   CONSTRAINT fk_appt_provider FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE,
   INDEX idx_provider_date (provider_id, app_date),
-  INDEX idx_status (status)
+  INDEX idx_status (status),
+  INDEX idx_app_fingerprint (client_ip, customer_fingerprint)
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -119,6 +122,7 @@ INSERT IGNORE INTO settings (`key`,`value`) VALUES
  ('theme', '{"primary":"#0284c7","secondary":"#4f46e5","surface":"#ffffff","background":"#f8fafc","text":"#0f172a"}'),
  ('booking', '{"slot_minutes":30,"day_start":"09:00","day_end":"18:00","lead_days":0,"max_days":60,"allow_weekend":0}'),
  ('custom_assets', '{"css":"","js":""}'),
+ ('recaptcha', '{"enabled":0,"site_key":"","secret_key":""}'),
  ('smtp', '{"enabled":0,"host":"","port":587,"encryption":"tls","username":"","password":"","from":"noreply@example.com","from_name":"Randevu Sistemi"}'),
  ('sms', '{"provider":"netgsm","username":"","password":"","header":""}'),
  ('notification_templates', '{"email":{"appointment_customer":{"subject":"Randevu Onayı #{appointment_id}","body":"<p>Merhaba {customer_name},</p><p>{provider_name} ile {appointment_date} tarihinde saat {appointment_time} için randevunuz oluşturuldu.</p>"},"appointment_provider":{"subject":"Yeni Randevu #{appointment_id}","body":"<p>Merhaba {provider_name},</p><p>{customer_name} tarafından {appointment_date} {appointment_time} tarihinde randevu alındı.</p>"},"bulk_default":{"subject":"Duyuru","body":"<p>{message}</p>"}},"sms":{"appointment_customer":"Randevunuz {appointment_date} {appointment_time} tarihinde onaylandı.","appointment_provider":"{customer_name}, {appointment_date} {appointment_time} için yeni randevu aldı.","bulk_default":"{message}"}}');

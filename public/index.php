@@ -16,6 +16,7 @@ $contact    = contact_settings($pdo);
 $theme      = theme_settings($pdo);
 $assets     = custom_assets($pdo);
 $languages  = available_languages($pdo);
+$recaptchaConfig = recaptcha_settings($pdo);
 $pageTitle  = $site['title'] ?? t('title');
 $canonical  = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https://' : 'http://')
             . ($_SERVER['HTTP_HOST'] ?? 'localhost')
@@ -42,6 +43,9 @@ if (!in_array($page, $allowed, true)) $page = 'home';
   <meta property="og:locale" content="<?= h($langCode) ?>">
   <meta name="theme-color" content="<?= h($theme['primary']) ?>">
   <script src="https://cdn.tailwindcss.com"></script>
+  <?php if (!empty($recaptchaConfig['enabled']) && !empty($recaptchaConfig['site_key'])): ?>
+    <script src="https://www.google.com/recaptcha/api.js?hl=<?= h($langCode) ?>" async defer></script>
+  <?php endif; ?>
   <style>
     :root {
       --color-primary: <?= h($theme['primary']) ?>;
@@ -227,6 +231,21 @@ if (!in_array($page, $allowed, true)) $page = 'home';
           });
         });
       }
+      document.querySelectorAll('[data-phone-input]').forEach(input => {
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('maxlength', '12');
+        const format = () => {
+          let digits = input.value.replace(/\D/g, '').slice(0, 10);
+          const parts = [];
+          if (digits.length > 0) parts.push(digits.slice(0, Math.min(3, digits.length)));
+          if (digits.length > 3) parts.push(digits.slice(3, Math.min(6, digits.length)));
+          if (digits.length > 6) parts.push(digits.slice(6, 10));
+          input.value = parts.join(' ').trim();
+        };
+        input.addEventListener('input', format);
+        input.addEventListener('blur', format);
+        format();
+      });
     })();
   </script>
   <script type="application/ld+json">

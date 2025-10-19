@@ -10,6 +10,7 @@ $assets    = custom_assets($pdo);
 $smtp      = smtp_settings($pdo);
 $sms       = sms_settings($pdo);
 $templates = notification_templates($pdo);
+$security  = recaptcha_settings($pdo);
 
 if (is_post()) {
   csrf_check();
@@ -69,6 +70,14 @@ if (is_post()) {
     $sms['header']   = trim($_POST['header'] ?? $sms['header']);
     settings_set($pdo, 'sms', $sms);
     set_flash('success', 'SMS ayarları güncellendi.');
+  } elseif ($action === 'security') {
+    $security['enabled'] = isset($_POST['enabled']) ? 1 : 0;
+    $security['site_key'] = trim($_POST['site_key'] ?? $security['site_key']);
+    if (!empty($_POST['secret_key'])) {
+      $security['secret_key'] = trim($_POST['secret_key']);
+    }
+    settings_set($pdo, 'recaptcha', $security);
+    set_flash('success', 'Güvenlik ayarları güncellendi.');
   } elseif ($action === 'templates') {
     foreach (['email','sms'] as $channel) {
       foreach ($templates[$channel] as $key => $value) {
@@ -186,6 +195,28 @@ admin_render_header('Site Ayarları', 'settings');
       </label>
       <label class="text-sm text-slate-600">
         <input type="checkbox" name="allow_weekend" value="1" <?= !empty($booking['allow_weekend']) ? 'checked' : '' ?>> Hafta sonu randevu olsun
+      </label>
+      <div class="md:col-span-2">
+        <button class="px-4 py-2 rounded-lg bg-slate-900 text-white">Kaydet</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="border rounded-xl bg-white p-5">
+    <h2 class="text-lg font-semibold text-slate-700 mb-3">Güvenlik & reCAPTCHA</h2>
+    <form method="post" class="grid md:grid-cols-2 gap-4">
+      <?= csrf_field() ?>
+      <input type="hidden" name="action" value="security">
+      <label class="text-sm text-slate-600 flex items-center gap-2">
+        <input type="checkbox" name="enabled" value="1" <?= !empty($security['enabled']) ? 'checked' : '' ?>> Etkin
+      </label>
+      <div></div>
+      <label class="text-sm text-slate-600">Site Key
+        <input type="text" name="site_key" value="<?= h($security['site_key']) ?>" class="mt-1 border rounded-lg w-full p-2" placeholder="reCAPTCHA site key">
+      </label>
+      <label class="text-sm text-slate-600">Secret Key
+        <input type="password" name="secret_key" value="" class="mt-1 border rounded-lg w-full p-2" placeholder="Yeni secret key">
+        <p class="text-xs text-slate-400 mt-1">Boş bırakırsanız mevcut anahtar korunur.</p>
       </label>
       <div class="md:col-span-2">
         <button class="px-4 py-2 rounded-lg bg-slate-900 text-white">Kaydet</button>

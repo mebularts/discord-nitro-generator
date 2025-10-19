@@ -8,8 +8,20 @@ $langCode = current_language_code($pdo);
 
 if (is_post()) {
   csrf_check();
+  $clientIp = $_SESSION['book']['client_ip'] ?? request_ip();
+  $fingerprint = $_SESSION['book']['fingerprint'] ?? customer_fingerprint(
+    $b['full_name'] ?? '',
+    $b['birth'] ?? '',
+    normalize_phone($b['phone'] ?? ''),
+    $b['email'] ?? ''
+  );
+  $duplicate = duplicate_appointment_exists($pdo, $clientIp, $fingerprint);
+  if ($duplicate) {
+    $_SESSION['book']['duplicate_lock'] = $duplicate;
+    redirect('/?p=date');
+  }
   $appId = null;
-  q($pdo, 'INSERT INTO appointments (provider_id, full_name, gender, birth, phone, email, note, app_date, app_time, duration_minutes, status, lang_code, created_at, reminder_sent) VALUES (?,?,?,?,?,?,?,?,?,?,?, ?, NOW(),0)', [
+  q($pdo, 'INSERT INTO appointments (provider_id, full_name, gender, birth, phone, email, note, app_date, app_time, duration_minutes, status, lang_code, client_ip, customer_fingerprint, created_at, reminder_sent) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, NOW(),0)', [
     $b['pid'],
     $b['full_name'],
     $b['gender'],
@@ -22,6 +34,8 @@ if (is_post()) {
     $duration,
     'new',
     $langCode,
+    $clientIp,
+    $fingerprint,
   ]);
   $appId = (int)$pdo->lastInsertId();
   $_SESSION['last_id'] = $appId;
