@@ -1,0 +1,1 @@
+ALTER TABLE providers ADD COLUMN image VARCHAR(255) NULL AFTER sort;

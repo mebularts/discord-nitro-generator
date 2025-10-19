@@ -1,0 +1,20 @@
+{
+    "default_lang": "tr",
+    "langs": [
+        "tr"
+    ],
+    "strings": {
+        "tr": {
+            "title": "Randevu Sistemi",
+            "btn.next": "Devam et",
+            "btn.prev": "Geri dön",
+            "book.info": "Genel bilgiler",
+            "book.date": "Randevu tarihi",
+            "book.time": "Randevu saati",
+            "confirm.provider": "Randevu veren",
+            "confirm.date": "Randevu tarihi",
+            "confirm.time": "Randevu saati",
+            "success.title": "Randevunuz Oluşturuldu!"
+        }
+    }
+}

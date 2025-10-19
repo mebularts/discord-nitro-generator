@@ -1,0 +1,11 @@
+<?php
+session_start(); require_once __DIR__.'/../../app/helpers.php'; must_login();
+$dir=__DIR__.'/../uploads/providers'; @mkdir($dir,0777,true);
+function upload($f){ global $dir; if(!isset($_FILES[$f])||$_FILES[$f]['error']!==UPLOAD_ERR_OK) return null; $ext=strtolower(pathinfo($_FILES[$f]['name'],PATHINFO_EXTENSION)); if(!in_array($ext,['jpg','jpeg','png','gif','webp'])) return null; $n=bin2hex(random_bytes(8)).'.'.$ext; move_uploaded_file($_FILES[$f]['tmp_name'],$dir.'/'.$n); return $n; }
+if(is_post()){ csrf_check(); $img=upload('image'); q($pdo,'INSERT INTO providers(name,active,sort,image) VALUES(?,?,?,?)',[trim($_POST['name']), isset($_POST['active'])?1:0, (int)$_POST['sort'], $img]); header('Location: /admin/providers.php'); exit; }
+$rows=q($pdo,'SELECT * FROM providers ORDER BY sort,name')->fetchAll();
+?><!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><script src="https://cdn.tailwindcss.com"></script><title>Personel</title></head>
+<body class="bg-slate-50"><div class="max-w-6xl mx-auto px-4 py-8"><a class="underline" href="/admin/">← Geri</a><h1 class="text-xl font-semibold my-4">Personel</h1>
+<form method="post" enctype="multipart/form-data" class="bg-white rounded-xl shadow border p-4 grid md:grid-cols-4 gap-3"><?=csrf_field()?><input name="name" class="border rounded px-2 py-1" placeholder="Ad"><label class="inline-flex items-center gap-2"><input type="checkbox" name="active"> Aktif</label><input name="sort" type="number" value="0" class="border rounded px-2 py-1" placeholder="Sıra"><input type="file" name="image" accept="image/*" class="md:col-span-2"><button class="px-4 py-2 rounded bg-sky-600 text-white">Ekle</button></form>
+<div class="bg-white rounded-xl shadow border mt-6 divide-y"><?php foreach($rows as $r): $img = ($r['image'] && file_exists(__DIR__.'/../uploads/providers/'.$r['image'])) ? '/uploads/providers/'.$r['image'] : 'https://placehold.co/80x80?text=+'; ?><div class="p-3 flex items-center justify-between gap-3"><div class="flex items-center gap-3"><img src="<?=$img?>" class="w-16 h-16 rounded-xl object-cover border"><div>#<?=$r['id']?> - <?=h($r['name'])?></div></div></div><?php endforeach; ?></div>
+</div></body></html>
