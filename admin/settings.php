@@ -1,33 +1,36 @@
 
-<?php require __DIR__.'/_auth.php'; require_once __DIR__.'/../app/db.php'; require_once __DIR__.'/../app/helpers.php';
-$pdo=db();
-function set_setting($k,$v){ $st=db()->prepare("INSERT INTO settings(k,v) VALUES(?,?) ON DUPLICATE KEY UPDATE v=VALUES(v)"); $st->execute([$k,$v]); }
-function get_setting($k,$def=''){ $st=db()->prepare("SELECT v FROM settings WHERE k=?"); $st->execute([$k]); $v=$st->fetchColumn(); return $v!==false?$v:$def; }
+<?php require __DIR__.'/_auth.php'; require_once __DIR__.'/../app/db.php'; require_once __DIR__.'/../app/helpers.php'; require_once __DIR__.'/../app/Models/Setting.php';
+use App\Models\Setting;
 $msg='';
-if($_SERVER['REQUEST_METHOD']==='POST'){ csrf_check();
-  $fields=['site.name','site.logo_url','theme.primary_color','seo.meta_description','footer.html','ads.header','ads.sidebar','ads.inline','ads.footer','custom.head_css','custom.head_js','custom.body_css','custom.body_js','i18n.default_locale','i18n.enabled_locales','deepl.api_key','pwa.theme_color','pwa.background_color'];
-  foreach($fields as $f){ set_setting($f, $_POST[str_replace('.','_',$f)] ?? ''); }
+if($_SERVER['REQUEST_METHOD']==='POST'){
+  csrf_check();
+  $fields=['site.name','site.logo_url','site.url','theme.primary_color','seo.meta_description','footer.html','ads.header','ads.sidebar','ads.inline','ads.footer','custom.head_css','custom.head_js','custom.body_css','custom.body_js','i18n.default_locale','i18n.enabled_locales','deepl.api_key','pwa.theme_color','pwa.background_color'];
+  foreach($fields as $f){
+    $postKey = str_replace('.','_',$f);
+    Setting::set($f, $_POST[$postKey] ?? '');
+  }
   $msg='Ayarlar kaydedildi.';
 }
 $vals=[
-  'site.name'=>get_setting('site.name','SolveClone'),
-  'site.logo_url'=>get_setting('site.logo_url',''),
-  'theme.primary_color'=>get_setting('theme.primary_color','#4f46e5'),
-  'seo.meta_description'=>get_setting('seo.meta_description',''),
-  'footer.html'=>get_setting('footer.html',''),
-  'ads.header'=>get_setting('ads.header',''),
-  'ads.sidebar'=>get_setting('ads.sidebar',''),
-  'ads.inline'=>get_setting('ads.inline',''),
-  'ads.footer'=>get_setting('ads.footer',''),
-  'custom.head_css'=>get_setting('custom.head_css',''),
-  'custom.head_js'=>get_setting('custom.head_js',''),
-  'custom.body_css'=>get_setting('custom.body_css',''),
-  'custom.body_js'=>get_setting('custom.body_js',''),
-  'i18n.default_locale'=>get_setting('i18n.default_locale','tr'),
-  'i18n.enabled_locales'=>get_setting('i18n.enabled_locales','["tr","en"]'),
-  'deepl.api_key'=>get_setting('deepl.api_key',''),
-  'pwa.theme_color'=>get_setting('pwa.theme_color','#4f46e5'),
-  'pwa.background_color'=>get_setting('pwa.background_color','#ffffff'),
+  'site.name'=>Setting::get('site.name','SolveClone'),
+  'site.logo_url'=>Setting::get('site.logo_url',''),
+  'site.url'=>Setting::get('site.url',''),
+  'theme.primary_color'=>Setting::get('theme.primary_color','#4f46e5'),
+  'seo.meta_description'=>Setting::get('seo.meta_description',''),
+  'footer.html'=>Setting::get('footer.html',''),
+  'ads.header'=>Setting::get('ads.header',''),
+  'ads.sidebar'=>Setting::get('ads.sidebar',''),
+  'ads.inline'=>Setting::get('ads.inline',''),
+  'ads.footer'=>Setting::get('ads.footer',''),
+  'custom.head_css'=>Setting::get('custom.head_css',''),
+  'custom.head_js'=>Setting::get('custom.head_js',''),
+  'custom.body_css'=>Setting::get('custom.body_css',''),
+  'custom.body_js'=>Setting::get('custom.body_js',''),
+  'i18n.default_locale'=>Setting::get('i18n.default_locale','tr'),
+  'i18n.enabled_locales'=>Setting::get('i18n.enabled_locales','["tr","en"]'),
+  'deepl.api_key'=>Setting::get('deepl.api_key',''),
+  'pwa.theme_color'=>Setting::get('pwa.theme_color','#4f46e5'),
+  'pwa.background_color'=>Setting::get('pwa.background_color','#ffffff'),
 ];
 ?>
 <!doctype html><html lang="tr"><head>
@@ -41,6 +44,7 @@ $vals=[
     <input type="hidden" name="csrf" value="<?= csrf_token() ?>">
     <div class="col-md-4"><label class="form-label">Site Adı</label><input class="form-control" name="site_name" value="<?= h($vals['site.name']) ?>"></div>
     <div class="col-md-4"><label class="form-label">Logo URL</label><input class="form-control" name="site_logo_url" value="<?= h($vals['site.logo_url']) ?>"></div>
+    <div class="col-md-4"><label class="form-label">Site URL</label><input class="form-control" name="site_url" placeholder="https://example.com" value="<?= h($vals['site.url']) ?>"></div>
     <div class="col-md-4"><label class="form-label">Tema Rengi</label><input class="form-control" name="theme_primary_color" value="<?= h($vals['theme.primary_color']) ?>"></div>
 
     <div class="col-12"><label class="form-label">Meta Açıklaması</label><input class="form-control" name="seo_meta_description" value="<?= h($vals['seo.meta_description']) ?>"></div>

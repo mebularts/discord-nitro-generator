@@ -2,7 +2,7 @@
 <?php
 ob_start(); ?>
 <div class="tw-flex tw-items-center tw-gap-3 tw-mb-4">
-  <form method="get" class="tw-flex tw-gap-2 tw-items-end">
+  <form method="get" class="tw-flex tw-gap-2 tw-flex-wrap md:tw-flex-nowrap tw-items-end">
     <div>
       <label class="tw-block tw-text-xs tw-text-gray-500">Difficulty</label>
       <select name="difficulty" class="form-select">
@@ -21,14 +21,26 @@ ob_start(); ?>
         <?php endforeach; ?>
       </select>
     </div>
+    <div>
+      <label class="tw-block tw-text-xs tw-text-gray-500">Category</label>
+      <select name="category" class="form-select">
+        <option value="">All</option>
+        <?php foreach (($categories ?? []) as $cat): ?>
+          <option value="<?= h($cat['slug']) ?>" <?= (!empty($filters['category']) && $filters['category'] === $cat['slug']) ? 'selected' : '' ?>><?= h($cat['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
     <div class="tw-self-end">
       <button class="btn btn-primary">Filtrele</button>
     </div>
   </form>
 </div>
 
+<?php if(empty($items)): ?>
+  <div class="tw-bg-white tw-border tw-rounded-2xl tw-p-6 tw-text-center tw-text-gray-600">Bu kriterlere uygun soru bulunamadı.</div>
+<?php else: ?>
 <div class="tw-grid md:tw-grid-cols-2 tw-gap-4">
-  <?php foreach (($items??[]) as $r): ?>
+  <?php foreach ($items as $r): ?>
     <article class="tw-bg-white tw-border tw-rounded-2xl tw-p-4">
       <h2 class="tw-text-lg tw-font-semibold tw-mb-2">
         <a href="/riddle/<?= h($r['slug']) ?>" class="tw-text-gray-900 hover:tw-text-indigo-600"><?= h($r['title']) ?></a>
@@ -41,6 +53,7 @@ ob_start(); ?>
     </article>
   <?php endforeach; ?>
 </div>
+<?php endif; ?>
 
 <?php paginator($page,$per,$total); ?>
 <?php $content = ob_get_clean(); include __DIR__.'/layouts/base.php'; ?>

@@ -1,11 +1,12 @@
-
 <?php
 declare(strict_types=1);
 namespace App\Controllers;
 require_once __DIR__.'/../Models/Riddle.php';
+require_once __DIR__.'/../Models/Category.php';
 require_once __DIR__.'/../helpers.php';
 
 use App\Models\Riddle;
+use App\Models\Category;
 
 class HomeController {
   public function index(){
@@ -18,7 +19,8 @@ class HomeController {
       'sort'      => $_GET['sort'] ?? 'pop'
     ];
     $data = Riddle::paginate($q);
-    view('home.php', $data + ['filters'=>$q]);
+    $categories = Category::all();
+    view('home.php', $data + ['filters'=>$q, 'categories'=>$categories]);
   }
   public function latest(){ $_GET['sort']='new'; return $this->index(); }
 }

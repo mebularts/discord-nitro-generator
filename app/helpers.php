@@ -1,13 +1,21 @@
-
 <?php
 declare(strict_types=1);
 
 function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 function base_url($path=''){
-  $url = getenv('APP_URL') ?: '';
-  if ($url && substr($url,-1) === '/') $url = rtrim($url,'/');
-  return $url . $path;
+  $base = setting('site.url', getenv('APP_URL') ?: '');
+  if ($base && substr($base,-1) === '/') {
+    $base = rtrim($base,'/');
+  }
+  return $base . $path;
+}
+
+function current_url(): string {
+  $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+  $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+  $uri  = $_SERVER['REQUEST_URI'] ?? '/';
+  return $scheme . '://' . $host . $uri;
 }
 
 function view($file, $vars=[]) {
@@ -28,14 +36,32 @@ function csrf_check(){
   if(!$ok){ http_response_code(400); exit('Bad CSRF'); }
 }
 
+function setting(string $key, $default = '') {
+  require_once __DIR__ . '/Models/Setting.php';
+  return \App\Models\Setting::get($key, $default);
+}
+
+function app_log(string $message, array $context = []): void {
+  $dir = dirname(__DIR__) . '/storage/logs';
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, true);
+  }
+  $line = '[' . date('Y-m-d H:i:s') . '] ' . $message;
+  if ($context) {
+    $line .= ' ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+  }
+  $line .= PHP_EOL;
+  @file_put_contents($dir . '/app.log', $line, FILE_APPEND);
+}
+
 function paginator($page,$per,$total){
   $pages = max(1, (int)ceil($total / max(1,$per)));
   if ($pages<=1) return;
-  echo '<nav class="tw-flex tw-gap-2 tw-my-6">';
+  echo '<nav class="tw-flex tw-gap-2 tw-my-6" aria-label="Pagination">';
   for($i=1;$i<=$pages;$i++){
     $cls = $i==$page ? 'tw-bg-indigo-600 tw-text-white' : 'tw-bg-white tw-text-gray-700';
     $q = $_GET; $q['page']=$i; $qs = http_build_query($q);
-    echo '<a class="tw-px-3 tw-py-1 tw-rounded tw-border '+$cls+'" href="?'.$qs.'">'.$i.'</a>';
+    echo '<a class="tw-px-3 tw-py-1 tw-rounded tw-border '.$cls.'" href="?'.$qs.'">'.$i.'</a>';
   }
   echo '</nav>';
 }

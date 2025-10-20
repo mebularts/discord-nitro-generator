@@ -1,4 +1,3 @@
-
 <?php
 declare(strict_types=1);
 session_start();
@@ -15,6 +14,7 @@ $router->get('/terms', 'StaticController@page');
 $router->get('/privacy', 'StaticController@page');
 $router->get('/advertising', 'StaticController@page');
 $router->get('/contact', 'StaticController@page');
+$router->get('/app', 'StaticController@page');
 
 $router->post('/api/vote', 'ApiController@vote');
 

@@ -87,9 +87,27 @@ CREATE TABLE IF NOT EXISTS settings (
   v MEDIUMTEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Translations cache
+CREATE TABLE IF NOT EXISTS translations (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  hash CHAR(64) UNIQUE NOT NULL,
+  source_text MEDIUMTEXT NOT NULL,
+  translated_text MEDIUMTEXT NOT NULL,
+  source_lang VARCHAR(10) DEFAULT NULL,
+  target_lang VARCHAR(10) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Seed minimal pages
 INSERT IGNORE INTO pages(slug,title,body) VALUES
 ('terms','Terms','<p>Terms will be here.</p>'),
 ('privacy','Privacy','<p>Privacy policy will be here.</p>'),
 ('advertising','Advertising','<p>Advertising info.</p>'),
-('contact','Contact','<p>Contact us.</p>');
+('contact','Contact','<p>Contact us.</p>'),
+('app','SolveClone App','<p>Install this web app from your device menu.</p>');
+
+-- Seed sample categories
+INSERT IGNORE INTO categories(name,slug) VALUES
+('Logic','logic'),
+('Math','math'),
+('Wordplay','wordplay');
