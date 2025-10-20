@@ -1,0 +1,4 @@
+/* extra styles */
+.tw-prose p{margin-bottom:0.8rem;}
+#installPrompt{transition:opacity .3s ease;}
+#installPrompt.tw-hidden{opacity:0;pointer-events:none;}
