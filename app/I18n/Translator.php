@@ -49,16 +49,22 @@ class Translator
         }
 
         $hash = hash('sha256', $text . '|' . $targetLang . '|' . ($sourceLang ?: 'auto'));
-        $pdo = db();
-        $stmt = $pdo->prepare('SELECT translated_text FROM translations WHERE hash = ? LIMIT 1');
-        $stmt->execute([$hash]);
-        $cached = $stmt->fetchColumn();
-        if ($cached !== false) {
-            return (string) $cached;
+
+        $pdo = null;
+        try {
+            $pdo = db();
+            $stmt = $pdo->prepare('SELECT translated_text FROM translations WHERE hash = ? LIMIT 1');
+            $stmt->execute([$hash]);
+            $cached = $stmt->fetchColumn();
+            if ($cached !== false) {
+                return (string) $cached;
+            }
+        } catch (\Throwable $e) {
+            app_log('translation cache read failed', ['error' => $e->getMessage()]);
         }
 
         $apiKey = getenv('DEEPL_API_KEY') ?: setting('deepl.api_key');
-        if (!$apiKey) {
+        if (!$apiKey || !function_exists('curl_init')) {
             return $text;
         }
 
@@ -72,6 +78,10 @@ class Translator
         }
 
         $ch = curl_init($url);
+        if (!$ch) {
+            return $text;
+        }
+
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
@@ -79,8 +89,10 @@ class Translator
         $res = curl_exec($ch);
         if ($res === false) {
             app_log('DeepL request failed', ['error' => curl_error($ch)]);
+            curl_close($ch);
             return $text;
         }
+        curl_close($ch);
 
         $json = json_decode($res, true);
         if (isset($json['message'])) {
@@ -88,8 +100,14 @@ class Translator
         }
         if (isset($json['translations'][0]['text'])) {
             $translated = $json['translations'][0]['text'];
-            $insert = $pdo->prepare('INSERT INTO translations(hash, source_text, translated_text, source_lang, target_lang) VALUES(?,?,?,?,?)');
-            $insert->execute([$hash, $text, $translated, $sourceLang, $targetLang]);
+            if ($pdo !== null) {
+                try {
+                    $insert = $pdo->prepare('INSERT INTO translations(hash, source_text, translated_text, source_lang, target_lang) VALUES(?,?,?,?,?)');
+                    $insert->execute([$hash, $text, $translated, $sourceLang, $targetLang]);
+                } catch (\Throwable $e) {
+                    app_log('translation cache write failed', ['error' => $e->getMessage()]);
+                }
+            }
             return $translated;
         }
 
