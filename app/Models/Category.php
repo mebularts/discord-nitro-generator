@@ -3,9 +3,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-require_once __DIR__ . '/../db.php';
-
 use PDO;
+
+use function db;
 
 class Category
 {

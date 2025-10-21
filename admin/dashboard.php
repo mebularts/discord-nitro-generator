@@ -1,32 +1,84 @@
-<?php require __DIR__.'/_auth.php'; require_once __DIR__.'/../app/db.php'; ?>
-<!doctype html><html lang="tr"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<title>Yönetim</title></head><body>
-<nav class="navbar navbar-expand-lg bg-body-tertiary">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="/admin/dashboard.php">Yönetim</a>
-    <div class="navbar-nav">
-      <a class="nav-link" href="/admin/riddles.php">Sorular</a>
-      <a class="nav-link" href="/admin/users.php">Kullanıcılar</a>
-      <a class="nav-link" href="/admin/pages.php">Sayfalar</a>
-      <a class="nav-link" href="/admin/settings.php">Ayarlar</a>
-    </div>
-  </div>
-</nav>
-<div class="container py-4">
-  <div class="row g-3">
-    <?php
-    $pdo=db();
-    $riddleCount=(int)$pdo->query("SELECT COUNT(*) FROM riddles")->fetchColumn();
-    $userCount=(int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
-    ?>
-    <div class="col-md-3"><div class="card"><div class="card-body">
-      <div class="fw-bold">Toplam Soru</div><div class="display-6"><?= $riddleCount ?></div>
-    </div></div></div>
-    <div class="col-md-3"><div class="card"><div class="card-body">
-      <div class="fw-bold">Kullanıcı</div><div class="display-6"><?= $userCount ?></div>
-    </div></div></div>
-  </div>
-</div>
-</body></html>
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/bootstrap.php';
+
+use App\Models\Riddle;
+
+$pdo = db();
+$stats = Riddle::stats();
+$latestRiddles = $pdo->query('SELECT id, title, slug, published_at FROM riddles ORDER BY published_at DESC, id DESC LIMIT 6')->fetchAll();
+
+admin_layout(
+    __('admin.dashboard.title', 'Control center'),
+    function () use ($stats, $latestRiddles) {
+        ?>
+        <div class="row g-4 mb-4">
+          <div class="col-md-3">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <div class="text-uppercase text-muted small"><?= __('admin.dashboard.total_riddles', 'Published riddles') ?></div>
+                <div class="display-6 fw-semibold"><?= number_format((int) ($stats['riddles'] ?? 0)) ?></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <div class="text-uppercase text-muted small"><?= __('admin.dashboard.total_users', 'Active users') ?></div>
+                <div class="display-6 fw-semibold"><?= number_format((int) ($stats['users'] ?? 0)) ?></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <div class="text-uppercase text-muted small"><?= __('admin.dashboard.total_votes', 'Votes cast') ?></div>
+                <div class="display-6 fw-semibold"><?= number_format((int) ($stats['votes'] ?? 0)) ?></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <div class="text-uppercase text-muted small"><?= __('admin.dashboard.total_views', 'Total views') ?></div>
+                <div class="display-6 fw-semibold"><?= number_format((int) ($stats['views'] ?? 0)) ?></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card shadow-sm">
+          <div class="card-header bg-white">
+            <h2 class="h5 mb-0"><?= __('admin.dashboard.latest_riddles', 'Latest submissions') ?></h2>
+          </div>
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col"><?= __('admin.forms.title', 'Title') ?></th>
+                  <th scope="col">URL</th>
+                  <th scope="col">Published</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php foreach ($latestRiddles as $row): ?>
+                  <tr>
+                    <td><?= (int) $row['id'] ?></td>
+                    <td><?= h($row['title']) ?></td>
+                    <td><a href="/riddle/<?= h($row['slug']) ?>" target="_blank">/riddle/<?= h($row['slug']) ?></a></td>
+                    <td><?= h($row['published_at']) ?></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <?php
+    },
+    [
+        'active' => 'dashboard',
+        'subtitle' => __('admin.dashboard.subtitle', 'Monitor growth, translation health and engagement at a glance.'),
+    ]
+);

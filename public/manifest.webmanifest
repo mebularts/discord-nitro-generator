@@ -1,20 +1,35 @@
 {
   "name": "SolveClone",
   "short_name": "SolveClone",
+  "description": "Modern, multilingual puzzle platform with offline support and instant translations.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#4f46e5",
+  "lang": "en",
   "icons": [
     {
-      "src": "/assets/img/icon-192.png",
+      "src": "/icon.php?size=192",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/assets/img/icon-512.png",
+      "src": "/icon.php?size=512",
       "sizes": "512x512",
       "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Latest riddles",
+      "short_name": "Latest",
+      "url": "/new"
+    },
+    {
+      "name": "Install guide",
+      "short_name": "Install",
+      "url": "/app"
     }
   ]
 }

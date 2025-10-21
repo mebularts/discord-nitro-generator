@@ -1,44 +1,87 @@
-// base js
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(err => {
-      console.warn('SW registration failed', err);
+(() => {
+  const doc = document.documentElement;
+  const body = document.body;
+  const themeKey = 'solveclone:theme';
+  const toggleBtn = document.querySelector('[data-action="toggle-theme"]');
+
+  const applyTheme = (theme) => {
+    doc.dataset.theme = theme;
+    body.setAttribute('data-theme', theme);
+    window.localStorage.setItem(themeKey, theme);
+  };
+
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const current = doc.dataset.theme === 'dark' ? 'dark' : 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      applyTheme(next);
     });
-  });
-}
-
-const installBanner = document.getElementById('installPrompt');
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  if (installBanner) {
-    installBanner.classList.remove('tw-hidden');
   }
-});
 
-if (installBanner) {
-  const installBtn = installBanner.querySelector('button');
-  if (installBtn) {
-    installBtn.addEventListener('click', async () => {
-      if (!deferredPrompt) return;
+  const storedTheme = window.localStorage.getItem(themeKey);
+  if (storedTheme) {
+    applyTheme(storedTheme);
+  }
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+
+  const installPrompt = document.getElementById('installPrompt');
+  const installButton = installPrompt?.querySelector('[data-action="install-pwa"]');
+  const tip = document.getElementById('platformTip');
+  let deferredPrompt = null;
+
+  const platform = (() => {
+    const ua = window.navigator.userAgent;
+    if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
+    if (/android/i.test(ua)) return 'android';
+    if (/windows|macintosh|linux/i.test(ua)) return 'desktop';
+    return 'other';
+  })();
+
+  const updateTip = () => {
+    if (!tip) return;
+    if (platform === 'android') {
+      tip.textContent = window.__('pwa.banner.android', 'Tap “Install” to pin SolveClone to your Android home screen.');
+    } else if (platform === 'ios') {
+      tip.textContent = window.__('pwa.banner.ios', 'Tap the share icon → “Add to Home Screen” on iOS to install.');
+    } else {
+      tip.textContent = window.__('pwa.banner.desktop', 'Use the browser install button to keep SolveClone one click away.');
+    }
+  };
+
+  window.__ = function (key, fallback) {
+    const dictionary = window.__solveTranslations || {};
+    return dictionary[key] || fallback;
+  };
+
+  if (installPrompt) {
+    updateTip();
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      deferredPrompt = event;
+      installPrompt.classList.remove('tw-hidden');
+    });
+
+    installButton?.addEventListener('click', async () => {
+      if (!deferredPrompt) {
+        updateTip();
+        return;
+      }
       deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      installBanner.classList.add('tw-hidden');
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        installPrompt.classList.add('tw-hidden');
+      }
       deferredPrompt = null;
     });
-  }
-}
 
-(function showPlatformTip(){
-  const el = document.getElementById('platformTip');
-  if (!el) return;
-  const ua = navigator.userAgent.toLowerCase();
-  if (/iphone|ipad|ipod/.test(ua)) {
-    el.textContent = 'iOS cihazlarda paylaş menüsünden \'Ana Ekrana Ekle\' seçeneğini kullanabilirsiniz.';
-  } else if (/android/.test(ua)) {
-    el.textContent = 'Android cihazlarda tarayıcı menüsünden veya yukarıdaki butondan uygulamayı ana ekrana ekleyin.';
-  } else {
-    el.textContent = 'Tarayıcınızda bu sayfayı yer imlerine ekleyebilir veya QR kodu paylaşabilirsiniz.';
+    if (platform === 'ios') {
+      // show iOS hint even without event
+      installPrompt.classList.remove('tw-hidden');
+    }
   }
 })();
