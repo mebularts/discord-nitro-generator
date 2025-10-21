@@ -1,0 +1,4 @@
+app/logs/*.log
+storage/uploads/avatars/*
+!.gitignore
+.env
