@@ -119,6 +119,30 @@ function json_response(array $payload, int $status = 200): void
     exit;
 }
 
+function abort(int $status = 404, string $message = ''): void
+{
+    http_response_code($status);
+
+    $isNotFound = $status === 404;
+    $view = $isNotFound ? 'errors/404.php' : 'errors/error.php';
+
+    if ($message === '') {
+        $message = $isNotFound
+            ? __('error.404.body', 'The page you are looking for could not be found.')
+            : __('error.generic.body', 'Something went wrong. Please try again later.');
+    }
+
+    view($view, [
+        'status'  => $status,
+        'message' => $message,
+        'title'   => $isNotFound
+            ? __('error.404.title', 'Page not found')
+            : __('error.generic.title', 'Unexpected error'),
+    ]);
+
+    exit;
+}
+
 function csrf_token(): string
 {
     if (session_status() !== PHP_SESSION_ACTIVE) {

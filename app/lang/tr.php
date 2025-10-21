@@ -112,4 +112,11 @@ return [
     'admin.forms.delete' => 'Sil',
     'admin.forms.publish' => 'Yayınla',
     'admin.forms.unpublish' => 'Yayından kaldır',
+
+    'error.404.title' => 'Sayfa bulunamadı',
+    'error.404.body' => 'Aradığınız sayfaya şu anda ulaşılamıyor.',
+    'error.404.cta' => 'Ana sayfaya dön',
+    'error.generic.title' => 'Beklenmeyen hata',
+    'error.generic.body' => 'Bir sorun oluştu. Lütfen daha sonra tekrar deneyin.',
+    'error.generic.cta' => 'Ana sayfaya dön',
 ];

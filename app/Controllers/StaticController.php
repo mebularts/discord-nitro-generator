@@ -6,6 +6,8 @@ namespace App\Controllers;
 use App\Models\Page;
 use App\Models\Riddle;
 
+use function abort;
+
 require_once __DIR__ . '/../helpers.php';
 
 class StaticController
@@ -20,8 +22,7 @@ class StaticController
         }
         $page = Page::findBySlug($slug);
         if (!$page) {
-            http_response_code(404);
-            exit('Not Found');
+            abort(404);
         }
         view('static/page.php', ['p' => $page]);
     }

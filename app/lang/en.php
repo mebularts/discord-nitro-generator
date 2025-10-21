@@ -112,4 +112,11 @@ return [
     'admin.forms.delete' => 'Delete',
     'admin.forms.publish' => 'Publish',
     'admin.forms.unpublish' => 'Unpublish',
+
+    'error.404.title' => 'Page not found',
+    'error.404.body' => 'The page you are looking for could not be found.',
+    'error.404.cta' => 'Back to homepage',
+    'error.generic.title' => 'Unexpected error',
+    'error.generic.body' => 'Something went wrong. Please try again later.',
+    'error.generic.cta' => 'Return home',
 ];

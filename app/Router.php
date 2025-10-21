@@ -2,6 +2,8 @@
 declare(strict_types=1);
 namespace App;
 
+use function abort;
+
 class Router {
   private $routes = [];
 
@@ -55,7 +57,6 @@ class Router {
       }
     }
 
-    http_response_code(404);
-    echo 'Not Found';
+    abort(404);
   }
 }
