@@ -1,29 +1,33 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Controllers;
 
 use App\Models\Riddle;
 
-use function abort;
-
-require_once __DIR__ . '/../helpers.php';
-
 class RiddleController
 {
-    public function show(string $slug): void
+    public function show(string $slug): string
     {
         $riddle = Riddle::findBySlug($slug);
         if (!$riddle) {
-            abort(404);
+            abort(404, __('riddles.not_found'));
         }
 
-        Riddle::incrementViews((int) $riddle['id']);
-        $related = Riddle::related((int) $riddle['id'], (string) $riddle['difficulty']);
+        $related = Riddle::related((int) $riddle['id']);
+        $stats   = Riddle::voteStats((int) $riddle['id']);
 
-        view('riddle/show.php', [
+        view_share(['meta' => [
+            'title'       => $riddle['title'] . ' • ' . setting('app_name', 'SolveClone'),
+            'description' => mb_substr(strip_tags($riddle['body']), 0, 160),
+            'image'       => app_icon_url('512x512'),
+        ]]);
+
+        return view('riddle/show', [
             'riddle'  => $riddle,
             'related' => $related,
+            'stats'   => $stats,
         ]);
     }
 }

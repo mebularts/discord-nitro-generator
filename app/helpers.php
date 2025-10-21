@@ -1,244 +1,289 @@
 <?php
+
 declare(strict_types=1);
 
 use App\I18n\Translator;
+use App\Models\Setting;
 
-function h($value): string
+/**
+ * Get environment variable with optional default.
+ */
+function env(string $key, ?string $default = null): ?string
 {
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    $value = getenv($key);
+    return $value === false ? $default : $value;
 }
 
-function app_path(string $path = ''): string
+/**
+ * Resolve locale ensuring translation files exist.
+ */
+function resolve_locale(?string $requested): string
 {
-    return __DIR__ . ($path ? '/' . ltrim($path, '/') : '');
+    $available = available_locales();
+    $requested = $requested ? strtolower($requested) : null;
+
+    if ($requested && in_array($requested, $available, true)) {
+        return $requested;
+    }
+
+    $fallback = $available[0] ?? 'en';
+    $configured = setting('default_locale', env('DEFAULT_LOCALE', $fallback));
+    if (in_array($configured, $available, true)) {
+        return $configured;
+    }
+
+    return $fallback;
+}
+
+/**
+ * Return cached translator instance.
+ */
+function translator(): Translator
+{
+    static $translator;
+    if ($translator instanceof Translator) {
+        return $translator;
+    }
+
+    $translator = new Translator(
+        cache_path('translations'),
+        env('DEEPL_AUTH_KEY'),
+        setting('default_locale', env('DEFAULT_LOCALE', 'en'))
+    );
+
+    return $translator;
+}
+
+/**
+ * Translate helper.
+ */
+function __(string $key, array $replace = [], ?string $locale = null): string
+{
+    return translator()->get($key, $replace, $locale ?? APP_LOCALE ?? env('DEFAULT_LOCALE', 'en'));
+}
+
+/**
+ * Return list of locales supported by language files.
+ */
+function available_locales(): array
+{
+    static $locales;
+    if ($locales !== null) {
+        return $locales;
+    }
+
+    $locales = [];
+    foreach (glob(APP_PATH . '/lang/*.php') as $file) {
+        $locales[] = basename($file, '.php');
+    }
+
+    sort($locales);
+    return $locales;
+}
+
+/**
+ * Get value from settings table or default.
+ */
+function setting(string $key, ?string $default = null): ?string
+{
+    static $cache = [];
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
+
+    try {
+        $value = Setting::value($key);
+    } catch (Throwable $e) {
+        $value = $default;
+    }
+
+    $cache[$key] = $value ?? $default;
+    return $cache[$key];
+}
+
+/**
+ * Shared view data store.
+ */
+function view_share(array $data): void
+{
+    static $shared = [];
+    $shared = array_merge($shared, $data);
+    $GLOBALS['__view_shared'] = $shared;
+}
+
+function view_shared(): array
+{
+    return $GLOBALS['__view_shared'] ?? [];
+}
+
+function view(string $template, array $data = []): string
+{
+    $path = APP_PATH . '/Views/' . $template . '.php';
+    if (!is_file($path)) {
+        throw new RuntimeException('View not found: ' . $template);
+    }
+
+    $shared = view_shared();
+    $data = array_merge($shared, $data);
+    extract($data, EXTR_SKIP);
+
+    ob_start();
+    include $path;
+    return (string) ob_get_clean();
+}
+
+function respond(string $content, int $status = 200, array $headers = []): void
+{
+    http_response_code($status);
+    foreach ($headers as $header => $value) {
+        header($header . ': ' . $value, true, $status);
+    }
+
+    echo $content;
+}
+
+function redirect(string $url): void
+{
+    header('Location: ' . $url);
+    exit;
+}
+
+function abort(int $status, string $message = ''): void
+{
+    http_response_code($status);
+    $template = $status === 404 ? 'errors/404' : 'errors/error';
+    $content = view($template, [
+        'code'    => $status,
+        'message' => $message ?: __('errors.generic'),
+    ]);
+    echo $content;
+    exit;
 }
 
 function storage_path(string $path = ''): string
 {
-    return dirname(__DIR__) . '/storage' . ($path ? '/' . ltrim($path, '/') : '');
+    return BASE_PATH . '/storage' . ($path ? '/' . ltrim($path, '/') : '');
 }
 
-function setting(string $key, $default = '')
+function cache_path(string $path = ''): string
 {
-    return App\Models\Setting::get($key, $default);
+    return storage_path('cache' . ($path ? '/' . ltrim($path, '/') : ''));
 }
 
-function locales_enabled(): array
+function log_path(string $path = ''): string
 {
-    $raw = setting('i18n.enabled_locales', getenv('ENABLED_LOCALES') ?: '["en","tr"]');
-    if (is_string($raw)) {
-        $decoded = json_decode($raw, true);
-        $locales = is_array($decoded) ? $decoded : [$raw];
-    } elseif (is_array($raw)) {
-        $locales = $raw;
-    } else {
-        $locales = ['en'];
+    return storage_path('logs' . ($path ? '/' . ltrim($path, '/') : ''));
+}
+
+function log_error(string $message): void
+{
+    $logFile = log_path('app.log');
+    if (!is_dir(dirname($logFile))) {
+        mkdir(dirname($logFile), 0775, true);
     }
 
-    $locales = array_values(array_unique(array_map(static fn ($l) => strtolower(trim((string) $l)), $locales)));
-    $default = strtolower(setting('i18n.default_locale', getenv('DEFAULT_LOCALE') ?: ($locales[0] ?? 'en')));
-    if (!in_array($default, $locales, true)) {
-        array_unshift($locales, $default);
+    error_log('[' . date('c') . '] ' . $message . PHP_EOL, 3, $logFile);
+}
+
+function csrf_token(): string
+{
+    if (empty($_SESSION['_csrf_token'])) {
+        $_SESSION['_csrf_token'] = bin2hex(random_bytes(16));
     }
 
-    return array_values(array_filter($locales));
+    return $_SESSION['_csrf_token'];
 }
 
-function resolve_locale(?string $preferred = null): string
+function csrf_input(): string
 {
-    $enabled = locales_enabled();
-    if ($preferred) {
-        $preferred = strtolower(trim($preferred));
-        if (in_array($preferred, $enabled, true)) {
-            return $preferred;
-        }
+    return '<input type="hidden" name="_token" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+}
+
+function verify_csrf_token(): void
+{
+    $token = $_POST['_token'] ?? '';
+    if (!hash_equals(csrf_token(), $token)) {
+        abort(419, 'CSRF token mismatch.');
     }
-    return $enabled[0] ?? 'en';
 }
 
-function __(
-    string $key,
-    string $default = '',
-    ?string $locale = null
-): string {
-    $locale = $locale ? strtolower($locale) : (defined('APP_LOCALE') ? APP_LOCALE : resolve_locale());
-    return Translator::phrase($key, $locale, $default !== '' ? $default : $key);
-}
-
-function base_url(string $path = ''): string
+function old(string $key, ?string $default = null): ?string
 {
-    $base = setting('site.url', getenv('APP_URL') ?: '');
-    if (!$base) {
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $base = $scheme . '://' . $host;
+    $value = $_SESSION['__old'][$key] ?? $default;
+    return is_string($value) ? $value : $default;
+}
+
+function with_old(array $inputs): void
+{
+    $_SESSION['__old'] = $inputs;
+}
+
+function flash(string $key, ?string $message = null)
+{
+    if ($message === null) {
+        $value = $_SESSION['__flash'][$key] ?? null;
+        unset($_SESSION['__flash'][$key]);
+        return $value;
     }
-    $base = rtrim($base, '/');
-    if ($path === '') {
-        return $base ?: '/';
-    }
-    return ($base ?: '') . '/' . ltrim($path, '/');
+
+    $_SESSION['__flash'][$key] = $message;
 }
 
-function asset_url(string $path): string
+function asset(string $path): string
 {
-    return base_url('assets/' . ltrim($path, '/'));
+    return '/assets/' . ltrim($path, '/');
 }
 
-function app_icon_url(int $size = 512): string
+function route(string $path = ''): string
 {
-    $size = ($size === 192) ? 192 : 512;
-    return base_url('icon.php?size=' . $size);
+    return '/' . ltrim($path, '/');
 }
 
 function current_url(): string
 {
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $uri  = $_SERVER['REQUEST_URI'] ?? '/';
+    $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $uri    = $_SERVER['REQUEST_URI'] ?? '/';
+
     return $scheme . '://' . $host . $uri;
 }
 
-function redirect(string $url, int $status = 302): void
+function app_icon_url(string $size = '256x256'): string
 {
-    header('Location: ' . $url, true, $status);
-    exit;
-}
+    if (strpos($size, 'x') !== false) {
+        [$width] = explode('x', $size, 2);
+        $numeric = (int) $width;
+        $size = $numeric >= 512 ? '512' : ($numeric >= 192 ? '192' : '192');
+    }
 
-function view(string $file, array $vars = []): void
-{
-    extract($vars);
-    require app_path('Views/' . $file);
+    return '/icon.php?size=' . urlencode($size);
 }
 
 function json_response(array $payload, int $status = 200): void
 {
-    http_response_code($status);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    header('Content-Type: application/json', true, $status);
+    echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-function abort(int $status = 404, string $message = ''): void
+function request_ip(): string
 {
-    http_response_code($status);
-
-    $isNotFound = $status === 404;
-    $view = $isNotFound ? 'errors/404.php' : 'errors/error.php';
-
-    if ($message === '') {
-        $message = $isNotFound
-            ? __('error.404.body', 'The page you are looking for could not be found.')
-            : __('error.generic.body', 'Something went wrong. Please try again later.');
-    }
-
-    view($view, [
-        'status'  => $status,
-        'message' => $message,
-        'title'   => $isNotFound
-            ? __('error.404.title', 'Page not found')
-            : __('error.generic.title', 'Unexpected error'),
-    ]);
-
-    exit;
-}
-
-function csrf_token(): string
-{
-    if (session_status() !== PHP_SESSION_ACTIVE) {
-        @session_start();
-    }
-    if (empty($_SESSION['csrf'])) {
-        $_SESSION['csrf'] = bin2hex(random_bytes(16));
-    }
-    return $_SESSION['csrf'];
-}
-
-function csrf_check(): void
-{
-    if (session_status() !== PHP_SESSION_ACTIVE) {
-        @session_start();
-    }
-    $token = $_POST['csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-    $isValid = isset($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], (string) $token);
-    if (!$isValid) {
-        http_response_code(400);
-        exit('Invalid CSRF token');
-    }
-}
-
-function cache_remember(string $key, int $ttl, callable $callback)
-{
-    $path = cache_file_path($key);
-    if (is_file($path)) {
-        $content = file_get_contents($path);
-        $data = $content ? json_decode($content, true) : null;
-        if (is_array($data) && ($data['expires_at'] ?? 0) >= time()) {
-            return $data['value'];
+    foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR'] as $key) {
+        if (!empty($_SERVER[$key])) {
+            $parts = explode(',', (string) $_SERVER[$key]);
+            return trim($parts[0]);
         }
     }
 
-    $value = $callback();
-    $dir = dirname($path);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
-    $payload = json_encode([
-        'expires_at' => time() + max($ttl, 1),
-        'value'      => $value,
-    ]);
-    @file_put_contents($path, $payload);
-    return $value;
+    return '0.0.0.0';
 }
 
-function cache_forget(string $key): void
+function request_user_agent(): string
 {
-    $path = cache_file_path($key);
-    if (is_file($path)) {
-        @unlink($path);
-    }
+    return $_SERVER['HTTP_USER_AGENT'] ?? 'cli';
 }
 
-function cache_file_path(string $key): string
+function voter_hash(): string
 {
-    $hash = sha1($key);
-    return storage_path('cache/' . substr($hash, 0, 2) . '/' . $hash . '.json');
-}
-
-function app_log(string $message, array $context = []): void
-{
-    $dir = storage_path('logs');
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0775, true);
-    }
-    $line = '[' . date('Y-m-d H:i:s') . '] ' . $message;
-    if ($context) {
-        $line .= ' ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    }
-    $line .= PHP_EOL;
-    @file_put_contents($dir . '/app.log', $line, FILE_APPEND);
-}
-
-function paginator(int $page, int $per, int $total): void
-{
-    $pages = max(1, (int) ceil($total / max(1, $per)));
-    if ($pages <= 1) {
-        return;
-    }
-    echo '<nav class="tw-flex tw-flex-wrap tw-gap-2 tw-my-6" aria-label="Pagination">';
-    for ($i = 1; $i <= $pages; $i++) {
-        $isActive = $i === $page;
-        $query = $_GET;
-        $query['page'] = $i;
-        $qs = http_build_query($query);
-        $classes = 'tw-px-3 tw-py-1 tw-rounded tw-border tw-text-sm ' . ($isActive ? 'tw-bg-indigo-600 tw-border-indigo-600 tw-text-white' : 'tw-bg-white tw-text-gray-700 hover:tw-bg-slate-100');
-        echo '<a class="' . $classes . '" href="?' . $qs . '">' . $i . '</a>';
-    }
-    echo '</nav>';
-}
-
-function percent(int $upVotes, int $downVotes): string
-{
-    $total = max(1, $upVotes + $downVotes);
-    return number_format(($upVotes / $total) * 100, 1);
+    return hash('sha256', request_ip() . '|' . request_user_agent());
 }

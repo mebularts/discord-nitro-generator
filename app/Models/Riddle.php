@@ -1,152 +1,120 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Models;
 
 use PDO;
 
-use function cache_remember;
-use function db;
-
 class Riddle
 {
-    public static function paginate(array $options): array
+    public static function paginated(array $filters = [], int $limit = 12, int $page = 1): array
     {
-        $pdo = db();
-        $where = ['r.status = "published"'];
+        $where = ['is_published = 1'];
         $params = [];
 
-        if (!empty($options['difficulty'])) {
-            $where[] = 'r.difficulty = ?';
-            $params[] = $options['difficulty'];
-        }
-        if (!empty($options['length'])) {
-            $where[] = 'r.length = ?';
-            $params[] = $options['length'];
-        }
-        if (!empty($options['category'])) {
-            $where[] = 'EXISTS(SELECT 1 FROM riddle_category rc JOIN categories c ON c.id = rc.category_id WHERE rc.riddle_id = r.id AND c.slug = ?)';
-            $params[] = $options['category'];
-        }
-        if (!empty($options['q'])) {
-            $like = '%' . $options['q'] . '%';
-            $where[] = '(r.title LIKE ? OR r.body LIKE ?)';
-            $params[] = $like;
-            $params[] = $like;
+        if (!empty($filters['category'])) {
+            $where[] = 'riddles.id IN (SELECT riddle_id FROM riddle_category rc INNER JOIN categories c ON c.id = rc.category_id WHERE c.slug = :category)';
+            $params['category'] = $filters['category'];
         }
 
-        $whereSql = 'WHERE ' . implode(' AND ', $where);
-        $sortKey = $options['sort'] ?? 'pop';
-        $orderBy = $sortKey === 'new'
-            ? 'r.published_at DESC, r.id DESC'
-            : '(r.up_votes - r.down_votes) DESC, r.views DESC, r.id DESC';
+        if (!empty($filters['difficulty'])) {
+            $where[] = 'difficulty = :difficulty';
+            $params['difficulty'] = $filters['difficulty'];
+        }
 
-        $page = max(1, (int) ($options['page'] ?? 1));
-        $perPage = min(60, max(10, (int) ($options['per_page'] ?? 20)));
-        $offset = ($page - 1) * $perPage;
+        if (!empty($filters['length'])) {
+            if ($filters['length'] === 'short') {
+                $where[] = 'CHAR_LENGTH(body) < 120';
+            } elseif ($filters['length'] === 'medium') {
+                $where[] = 'CHAR_LENGTH(body) BETWEEN 120 AND 300';
+            } elseif ($filters['length'] === 'long') {
+                $where[] = 'CHAR_LENGTH(body) > 300';
+            }
+        }
 
-        $countStmt = $pdo->prepare("SELECT COUNT(*) FROM riddles r {$whereSql}");
-        $countStmt->execute($params);
-        $total = (int) $countStmt->fetchColumn();
+        $page  = max(1, $page);
+        $limit = max(1, $limit);
+        $offset = ($page - 1) * $limit;
 
-        $listStmt = $pdo->prepare("SELECT r.* FROM riddles r {$whereSql} ORDER BY {$orderBy} LIMIT {$perPage} OFFSET {$offset}");
-        $listStmt->execute($params);
-        $items = array_map([self::class, 'decorate'], $listStmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
+        $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+        $total = db()->prepare('SELECT COUNT(*) FROM riddles ' . $whereSql);
+        $total->execute($params);
+        $count = (int) $total->fetchColumn();
+
+        $stmt = db()->prepare('SELECT * FROM riddles ' . $whereSql . ' ORDER BY published_at DESC LIMIT :limit OFFSET :offset');
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
         return [
-            'items' => $items,
-            'total' => $total,
-            'page'  => $page,
-            'per'   => $perPage,
+            'items'      => $items,
+            'total'      => $count,
+            'current'    => $page,
+            'per_page'   => $limit,
+            'totalPages' => (int) ceil($count / $limit),
         ];
-    }
-
-    public static function topVoted(int $limit = 6): array
-    {
-        $stmt = db()->prepare('SELECT * FROM riddles r WHERE r.status = "published" ORDER BY (r.up_votes - r.down_votes) DESC, r.views DESC LIMIT ?');
-        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
-        $stmt->execute();
-        return array_map([self::class, 'decorate'], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
-    }
-
-    public static function recent(int $limit = 6): array
-    {
-        $stmt = db()->prepare('SELECT * FROM riddles r WHERE r.status = "published" ORDER BY r.published_at DESC, r.id DESC LIMIT ?');
-        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
-        $stmt->execute();
-        return array_map([self::class, 'decorate'], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
-    }
-
-    public static function stats(): array
-    {
-        return cache_remember('riddle:stats', 300, static function () {
-            $pdo = db();
-            $riddleCount = (int) $pdo->query('SELECT COUNT(*) FROM riddles WHERE status = "published"')->fetchColumn();
-            $userCount = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
-            $voteCount = (int) $pdo->query('SELECT SUM(up_votes + down_votes) FROM riddles')->fetchColumn();
-            $views = (int) $pdo->query('SELECT SUM(views) FROM riddles')->fetchColumn();
-            return [
-                'riddles' => $riddleCount,
-                'users'   => $userCount,
-                'votes'   => $voteCount,
-                'views'   => $views,
-            ];
-        });
     }
 
     public static function findBySlug(string $slug): ?array
     {
-        $stmt = db()->prepare('SELECT * FROM riddles WHERE slug = ? AND status = "published" LIMIT 1');
-        $stmt->execute([$slug]);
+        $stmt = db()->prepare('SELECT * FROM riddles WHERE slug = :slug LIMIT 1');
+        $stmt->execute(['slug' => $slug]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) {
-            return null;
-        }
-        return self::decorate($row);
+        return $row ?: null;
     }
 
-    public static function incrementViews(int $id): void
+    public static function findById(int $id): ?array
     {
-        $stmt = db()->prepare('UPDATE riddles SET views = views + 1 WHERE id = ?');
-        $stmt->execute([$id]);
+        $stmt = db()->prepare('SELECT * FROM riddles WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 
-    public static function related(int $id, string $difficulty, int $limit = 4): array
+    public static function related(int $id, int $limit = 3): array
     {
-        $stmt = db()->prepare('SELECT * FROM riddles WHERE status = "published" AND id <> ? AND difficulty = ? ORDER BY (up_votes - down_votes) DESC, views DESC LIMIT ?');
-        $stmt->bindValue(1, $id, PDO::PARAM_INT);
-        $stmt->bindValue(2, $difficulty);
-        $stmt->bindValue(3, $limit, PDO::PARAM_INT);
+        $stmt = db()->prepare('SELECT r.* FROM riddles r
+            INNER JOIN riddle_category rc ON rc.riddle_id = r.id
+            WHERE rc.category_id IN (SELECT category_id FROM riddle_category WHERE riddle_id = :id)
+              AND r.id <> :id AND r.is_published = 1
+            ORDER BY r.published_at DESC
+            LIMIT :limit');
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
-        return array_map([self::class, 'decorate'], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
-    }
-
-    public static function sitemapEntries(): array
-    {
-        $stmt = db()->query('SELECT slug, updated_at, published_at FROM riddles WHERE status = "published" ORDER BY (updated_at IS NULL), updated_at DESC, published_at DESC');
-        return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
-    }
-
-    private static function decorate(array $riddle): array
-    {
-        $riddle['categories'] = self::categoriesFor((int) $riddle['id']);
-        $riddle['tags'] = self::tagsFor((int) $riddle['id']);
-        $totalVotes = max(1, (int) $riddle['up_votes'] + (int) $riddle['down_votes']);
-        $riddle['approval'] = round(((int) $riddle['up_votes'] / $totalVotes) * 100, 1);
-        return $riddle;
-    }
-
-    private static function categoriesFor(int $riddleId): array
-    {
-        $stmt = db()->prepare('SELECT c.slug, c.name FROM categories c JOIN riddle_category rc ON rc.category_id = c.id WHERE rc.riddle_id = ? ORDER BY c.sort_order ASC, c.name ASC');
-        $stmt->execute([$riddleId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    private static function tagsFor(int $riddleId): array
+    public static function recordVote(int $riddleId, int $score, string $hash): bool
     {
-        $stmt = db()->prepare('SELECT t.slug, t.name FROM tags t JOIN riddle_tag rt ON rt.tag_id = t.id WHERE rt.riddle_id = ? ORDER BY t.name ASC');
-        $stmt->execute([$riddleId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt = db()->prepare('INSERT INTO votes (riddle_id, voter_hash, score, created_at)
+            VALUES (:riddle_id, :hash, :score, NOW())
+            ON DUPLICATE KEY UPDATE score = :score, updated_at = NOW()');
+        return $stmt->execute([
+            'riddle_id' => $riddleId,
+            'hash'      => $hash,
+            'score'     => $score,
+        ]);
+    }
+
+    public static function voteStats(int $riddleId): array
+    {
+        $stmt = db()->prepare('SELECT
+            SUM(CASE WHEN score = 1 THEN 1 ELSE 0 END) AS upvotes,
+            SUM(CASE WHEN score = -1 THEN 1 ELSE 0 END) AS downvotes
+        FROM votes WHERE riddle_id = :id');
+        $stmt->execute(['id' => $riddleId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['upvotes' => 0, 'downvotes' => 0];
+        $up = (int) ($row['upvotes'] ?? 0);
+        $down = (int) ($row['downvotes'] ?? 0);
+        $total = max(1, $up + $down);
+        $percent = (int) round(($up / $total) * 100);
+        return ['upvotes' => $up, 'downvotes' => $down, 'percent' => $percent];
     }
 }

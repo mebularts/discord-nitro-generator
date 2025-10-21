@@ -1,163 +1,153 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\I18n;
 
-use function app_log;
-use function app_path;
-use function db;
-use function setting;
-use function storage_path;
+use RuntimeException;
+use Throwable;
 
 class Translator
 {
-    private static array $catalogue = [];
+    /** @var string */
+    protected $cachePath;
 
-    public static function phrase(string $key, string $locale, string $fallback): string
+    /** @var string|null */
+    protected $apiKey;
+
+    /** @var string */
+    protected $fallbackLocale;
+
+    /** @var string */
+    protected $locale = 'en';
+
+    public function __construct(string $cachePath, ?string $apiKey, string $fallbackLocale)
     {
-        $locale = strtolower($locale);
-        $catalogue = self::loadLocale($locale);
-        if (isset($catalogue[$key])) {
-            return $catalogue[$key];
-        }
-
-        $baseLocale = 'en';
-        $baseCatalogue = self::loadLocale($baseLocale);
-        $base = $baseCatalogue[$key] ?? $fallback;
-
-        if ($locale === $baseLocale) {
-            return $base;
-        }
-
-        $translated = self::translate($base, strtoupper($locale), strtoupper($baseLocale));
-        if (!is_string($translated) || trim($translated) === '') {
-            return $base;
-        }
-
-        self::store($locale, $key, $translated);
-        return $translated;
+        $this->cachePath = rtrim($cachePath, '/');
+        $this->apiKey = $apiKey ?: null;
+        $this->fallbackLocale = $fallbackLocale;
     }
 
-    public static function translate(string $text, string $targetLang, ?string $sourceLang = null): string
+    public function setLocale(string $locale): void
     {
-        $text = (string) $text;
-        $targetLang = strtoupper(trim($targetLang));
-        $sourceLang = $sourceLang ? strtoupper(trim($sourceLang)) : null;
+        $this->locale = $locale;
+    }
 
-        if ($text === '' || $targetLang === '') {
-            return $text;
+    public function get(string $key, array $replace = [], ?string $locale = null): string
+    {
+        $locale = $locale ?: $this->locale;
+        $lines = $this->loadLocale($locale);
+
+        $value = $lines[$key] ?? null;
+        if ($value === null && $locale !== $this->fallbackLocale) {
+            $lines = $this->loadLocale($this->fallbackLocale);
+            $value = $lines[$key] ?? $key;
         }
 
-        $hash = hash('sha256', $text . '|' . $targetLang . '|' . ($sourceLang ?: 'auto'));
+        $value = $value ?? $key;
 
-        $pdo = null;
-        try {
-            $pdo = db();
-            $stmt = $pdo->prepare('SELECT translated_text FROM translations WHERE hash = ? LIMIT 1');
-            $stmt->execute([$hash]);
-            $cached = $stmt->fetchColumn();
-            if ($cached !== false) {
-                return (string) $cached;
-            }
-        } catch (\Throwable $e) {
-            app_log('translation cache read failed', ['error' => $e->getMessage()]);
+        foreach ($replace as $k => $v) {
+            $value = str_replace(':' . $k, (string) $v, $value);
         }
 
-        $apiKey = getenv('DEEPL_API_KEY') ?: setting('deepl.api_key');
-        if (!$apiKey || !function_exists('curl_init')) {
-            return $text;
+        return $value;
+    }
+
+    protected function loadLocale(string $locale): array
+    {
+        static $cache = [];
+        if (isset($cache[$locale])) {
+            return $cache[$locale];
         }
 
-        $url = 'https://api-free.deepl.com/v2/translate';
-        $data = [
-            'text'        => $text,
-            'target_lang' => $targetLang,
-        ];
-        if ($sourceLang) {
-            $data['source_lang'] = $sourceLang;
+        $file = BASE_PATH . '/app/lang/' . $locale . '.php';
+        if (!is_file($file)) {
+            return $cache[$locale] = [];
         }
 
-        $ch = curl_init($url);
-        if (!$ch) {
-            return $text;
+        $lines = include $file;
+        if (!is_array($lines)) {
+            throw new RuntimeException('Invalid language file for locale ' . $locale);
         }
 
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: DeepL-Auth-Key ' . $apiKey]);
-        $res = curl_exec($ch);
-        if ($res === false) {
-            app_log('DeepL request failed', ['error' => curl_error($ch)]);
+        return $cache[$locale] = $lines;
+    }
+
+    public function translateRemote(string $text, string $targetLocale, string $sourceLocale = 'en'): ?string
+    {
+        if (!$this->apiKey || trim($text) === '') {
+            return null;
+        }
+
+        $hash = hash('sha256', $sourceLocale . '|' . $targetLocale . '|' . $text);
+        $cached = $this->readCache($hash);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $payload = http_build_query([
+            'auth_key' => $this->apiKey,
+            'text'     => $text,
+            'target_lang' => strtoupper($targetLocale),
+            'source_lang' => strtoupper($sourceLocale),
+        ]);
+
+        $ch = curl_init('https://api-free.deepl.com/v2/translate');
+        if ($ch === false) {
+            return null;
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
+            CURLOPT_TIMEOUT        => 15,
+        ]);
+
+        $response = curl_exec($ch);
+        if ($response === false) {
             curl_close($ch);
-            return $text;
+            return null;
         }
+
+        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        $json = json_decode($res, true);
-        if (isset($json['message'])) {
-            app_log('DeepL error', ['response' => $json]);
-        }
-        if (isset($json['translations'][0]['text'])) {
-            $translated = $json['translations'][0]['text'];
-            if ($pdo !== null) {
-                try {
-                    $insert = $pdo->prepare('INSERT INTO translations(hash, source_text, translated_text, source_lang, target_lang) VALUES(?,?,?,?,?)');
-                    $insert->execute([$hash, $text, $translated, $sourceLang, $targetLang]);
-                } catch (\Throwable $e) {
-                    app_log('translation cache write failed', ['error' => $e->getMessage()]);
-                }
-            }
-            return $translated;
+        if ($status !== 200) {
+            return null;
         }
 
-        return $text;
+        $json = json_decode($response, true);
+        $translation = $json['translations'][0]['text'] ?? null;
+        if ($translation) {
+            $this->writeCache($hash, $translation);
+        }
+
+        return $translation;
     }
 
-    public static function flush(?string $locale = null): void
+    protected function readCache(string $hash): ?string
     {
-        if ($locale === null) {
-            self::$catalogue = [];
-            return;
+        $file = $this->cachePath . '/' . $hash . '.txt';
+        if (!is_file($file)) {
+            return null;
         }
-        unset(self::$catalogue[strtolower($locale)]);
+
+        return file_get_contents($file) ?: null;
     }
 
-    private static function loadLocale(string $locale): array
+    protected function writeCache(string $hash, string $translation): void
     {
-        if (!isset(self::$catalogue[$locale])) {
-            $paths = [
-                app_path('lang/' . $locale . '.php'),
-                storage_path('cache/lang-' . $locale . '.php'),
-            ];
-            $dictionary = [];
-            foreach ($paths as $path) {
-                if (is_file($path)) {
-                    $data = include $path;
-                    if (is_array($data)) {
-                        $dictionary = $dictionary + $data;
-                    }
-                }
-            }
-            self::$catalogue[$locale] = $dictionary;
-        }
-        return self::$catalogue[$locale];
-    }
-
-    private static function store(string $locale, string $key, string $value): void
-    {
-        $locale = strtolower($locale);
-        $catalogue = self::loadLocale($locale);
-        $catalogue[$key] = $value;
-        self::$catalogue[$locale] = $catalogue;
-
-        $path = storage_path('cache/lang-' . $locale . '.php');
-        $dir = dirname($path);
+        $dir = $this->cachePath;
         if (!is_dir($dir)) {
-            @mkdir($dir, 0775, true);
+            mkdir($dir, 0775, true);
         }
-        $export = var_export($catalogue, true);
-        $content = "<?php\nreturn " . $export . ';';
-        @file_put_contents($path, $content);
+
+        try {
+            file_put_contents($dir . '/' . $hash . '.txt', $translation);
+        } catch (Throwable $e) {
+            // Ignore cache write errors silently.
+        }
     }
 }

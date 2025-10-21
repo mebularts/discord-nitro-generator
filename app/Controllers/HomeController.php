@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Controllers;
@@ -6,46 +7,32 @@ namespace App\Controllers;
 use App\Models\Category;
 use App\Models\Riddle;
 
-use function cache_remember;
-
-require_once __DIR__ . '/../helpers.php';
-
 class HomeController
 {
-    public function index(): void
+    public function __invoke(): string
     {
         $filters = [
-            'q'          => trim($_GET['q'] ?? ''),
+            'category'   => $_GET['category'] ?? null,
             'difficulty' => $_GET['difficulty'] ?? null,
             'length'     => $_GET['length'] ?? null,
-            'category'   => $_GET['category'] ?? null,
-            'page'       => max(1, (int) ($_GET['page'] ?? 1)),
-            'per_page'   => 20,
-            'sort'       => $_GET['sort'] ?? 'pop',
         ];
 
-        $data = Riddle::paginate($filters);
-        $categories = Category::all();
-        $stats = Riddle::stats();
-        $trending = cache_remember('home:trending', 300, static fn () => Riddle::topVoted(4));
-        $recent = cache_remember('home:recent', 300, static fn () => Riddle::recent(4));
+        $page    = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+        $perPage = 12;
 
-        view('home.php', [
-            'items'      => $data['items'],
-            'total'      => $data['total'],
-            'page'       => $data['page'],
-            'per'        => $data['per'],
+        $pagination = Riddle::paginated($filters, $perPage, $page);
+        $categories = Category::all();
+
+        $title = __('home.title');
+        view_share(['meta' => array_merge(view_shared()['meta'] ?? [], [
+            'title'       => $title . ' • ' . setting('app_name', 'SolveClone'),
+            'description' => __('home.description'),
+        ])]);
+
+        return view('home', [
             'filters'    => $filters,
             'categories' => $categories,
-            'stats'      => $stats,
-            'trending'   => $trending,
-            'recent'     => $recent,
+            'pagination' => $pagination,
         ]);
-    }
-
-    public function latest(): void
-    {
-        $_GET['sort'] = 'new';
-        $this->index();
     }
 }

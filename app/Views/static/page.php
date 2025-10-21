@@ -1,15 +1,13 @@
 <?php
-ob_start();
+declare(strict_types=1);
+/** @var array $page */
 ?>
-<article class="tw-bg-white tw-border tw-rounded-3xl tw-p-8 tw-shadow-sm">
-  <header class="tw-mb-6">
-    <h1 class="tw-text-3xl tw-font-bold tw-text-gray-900"><?= h($p['title']) ?></h1>
-  </header>
-  <div class="tw-prose tw-max-w-none tw-text-gray-800">
-    <?= $p['body'] ?>
-  </div>
+<?php ob_start(); ?>
+<article class="tw-rounded-3xl tw-bg-slate-900 tw-border tw-border-slate-800 tw-shadow-xl tw-p-6 tw-space-y-4">
+    <h1 class="tw-text-3xl tw-font-semibold tw-text-white"><?= htmlspecialchars($page['title'], ENT_QUOTES, 'UTF-8') ?></h1>
+    <div class="tw-text-slate-200 tw-leading-relaxed">
+        <?= $page['body'] ?>
+    </div>
 </article>
-<?php
-$content = ob_get_clean();
-$title = $p['title'];
+<?php $content = ob_get_clean();
 include __DIR__ . '/../layouts/base.php';

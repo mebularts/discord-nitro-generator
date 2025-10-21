@@ -1,21 +1,24 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Models;
 
 use PDO;
 
-use function db;
-
 class Category
 {
     public static function all(): array
     {
-        try {
-            $stmt = db()->query('SELECT slug, name FROM categories ORDER BY sort_order ASC, name ASC');
-            return $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
-        } catch (\Throwable $e) {
-            return [];
-        }
+        $stmt = db()->query('SELECT * FROM categories ORDER BY name ASC');
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public static function findBySlug(string $slug): ?array
+    {
+        $stmt = db()->prepare('SELECT * FROM categories WHERE slug = :slug LIMIT 1');
+        $stmt->execute(['slug' => $slug]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
     }
 }

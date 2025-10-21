@@ -1,87 +1,63 @@
 (() => {
-  const doc = document.documentElement;
-  const body = document.body;
-  const themeKey = 'solveclone:theme';
-  const toggleBtn = document.querySelector('[data-action="toggle-theme"]');
+    document.addEventListener('click', (event) => {
+        const toggle = event.target.closest('[data-action="toggle-answer"]');
+        if (toggle) {
+            const panel = toggle.closest('#answerPanel');
+            if (!panel) return;
+            const answer = panel.querySelector('[data-answer]');
+            if (!answer) return;
+            const hidden = answer.classList.toggle('tw-hidden');
+            toggle.textContent = hidden ? toggle.dataset.showText || toggle.textContent : (toggle.dataset.hideText || toggle.textContent);
+            if (!toggle.dataset.showText) {
+                toggle.dataset.showText = window.translations?.showAnswer || 'Show answer';
+            }
+            if (!toggle.dataset.hideText) {
+                toggle.dataset.hideText = window.translations?.hideAnswer || 'Hide answer';
+            }
+            toggle.textContent = hidden ? toggle.dataset.showText : toggle.dataset.hideText;
+        }
 
-  const applyTheme = (theme) => {
-    doc.dataset.theme = theme;
-    body.setAttribute('data-theme', theme);
-    window.localStorage.setItem(themeKey, theme);
-  };
-
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', () => {
-      const current = doc.dataset.theme === 'dark' ? 'dark' : 'light';
-      const next = current === 'dark' ? 'light' : 'dark';
-      applyTheme(next);
+        const voteButton = event.target.closest('[data-riddle-votes] [data-vote]');
+        if (voteButton) {
+            const widget = voteButton.closest('[data-riddle-votes]');
+            if (!widget) return;
+            const score = parseInt(voteButton.getAttribute('data-vote'), 10);
+            const id = parseInt(widget.getAttribute('data-riddle-id'), 10);
+            const error = widget.querySelector('[data-error]');
+            error?.classList.add('tw-hidden');
+            voteButton.disabled = true;
+            fetch('/api/vote', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: new URLSearchParams({
+                    _token: window.app?.csrfToken || '',
+                    id: String(id),
+                    score: String(score)
+                })
+            })
+            .then((res) => res.json())
+            .then((data) => {
+                if (!data.success) {
+                    throw new Error(data.error || 'Vote failed');
+                }
+                const stats = data.stats;
+                const scoreLabel = widget.querySelector('[data-score]');
+                if (scoreLabel) {
+                    scoreLabel.textContent = `${stats.percent}% positive (${stats.upvotes}/${stats.downvotes})`;
+                }
+            })
+            .catch((err) => {
+                if (error) {
+                    error.textContent = err.message;
+                    error.classList.remove('tw-hidden');
+                }
+            })
+            .finally(() => {
+                voteButton.disabled = false;
+            });
+        }
     });
-  }
-
-  const storedTheme = window.localStorage.getItem(themeKey);
-  if (storedTheme) {
-    applyTheme(storedTheme);
-  }
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
-    });
-  }
-
-  const installPrompt = document.getElementById('installPrompt');
-  const installButton = installPrompt?.querySelector('[data-action="install-pwa"]');
-  const tip = document.getElementById('platformTip');
-  let deferredPrompt = null;
-
-  const platform = (() => {
-    const ua = window.navigator.userAgent;
-    if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
-    if (/android/i.test(ua)) return 'android';
-    if (/windows|macintosh|linux/i.test(ua)) return 'desktop';
-    return 'other';
-  })();
-
-  const updateTip = () => {
-    if (!tip) return;
-    if (platform === 'android') {
-      tip.textContent = window.__('pwa.banner.android', 'Tap “Install” to pin SolveClone to your Android home screen.');
-    } else if (platform === 'ios') {
-      tip.textContent = window.__('pwa.banner.ios', 'Tap the share icon → “Add to Home Screen” on iOS to install.');
-    } else {
-      tip.textContent = window.__('pwa.banner.desktop', 'Use the browser install button to keep SolveClone one click away.');
-    }
-  };
-
-  window.__ = function (key, fallback) {
-    const dictionary = window.__solveTranslations || {};
-    return dictionary[key] || fallback;
-  };
-
-  if (installPrompt) {
-    updateTip();
-    window.addEventListener('beforeinstallprompt', (event) => {
-      event.preventDefault();
-      deferredPrompt = event;
-      installPrompt.classList.remove('tw-hidden');
-    });
-
-    installButton?.addEventListener('click', async () => {
-      if (!deferredPrompt) {
-        updateTip();
-        return;
-      }
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        installPrompt.classList.add('tw-hidden');
-      }
-      deferredPrompt = null;
-    });
-
-    if (platform === 'ios') {
-      // show iOS hint even without event
-      installPrompt.classList.remove('tw-hidden');
-    }
-  }
 })();
