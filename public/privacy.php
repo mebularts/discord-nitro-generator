@@ -2,6 +2,9 @@
 declare(strict_types=1);
 
 $pageTitle = 'Gizlilik Politikası';
+$pageMeta = [
+    'description' => 'SolveClone gizlilik politikası: kullanıcı verilerinin nasıl işlendiğini ve korunduğunu öğrenin.',
+];
 
 require_once __DIR__ . '/../app/bootstrap.php';
 

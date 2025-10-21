@@ -17,6 +17,10 @@ if (!$user) {
 }
 
 $pageTitle = 'Sorularım';
+$pageMeta = [
+    'description' => 'SolveClone gelen kutunuzdaki soruları görüntüleyin, yanıtlayın ve gizlilik tercihlerinizi yönetin.',
+    'robots' => 'noindex, nofollow',
+];
 $message = null;
 $error = null;
 

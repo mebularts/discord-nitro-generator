@@ -11,6 +11,10 @@ use function App\register;
 use function App\current_user;
 
 $pageTitle = 'Kayıt Ol';
+$pageMeta = [
+    'description' => 'SolveClone topluluğuna ücretsiz kaydolun, profilinizi özelleştirin ve arkadaşlarınıza anonim veya görünür sorular gönderin.',
+    'robots' => 'noindex, nofollow',
+];
 $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

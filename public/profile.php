@@ -20,6 +20,20 @@ if (!$profile) {
 }
 
 $pageTitle = $profile['username'] . ' Profili';
+$description = '';
+if (!empty($profile['bio'])) {
+    $plainBio = trim(strip_tags($profile['bio']));
+    if ($plainBio !== '') {
+        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+            $description = mb_strlen($plainBio, 'UTF-8') > 155 ? mb_substr($plainBio, 0, 155, 'UTF-8') . '…' : $plainBio;
+        } else {
+            $description = strlen($plainBio) > 155 ? substr($plainBio, 0, 155) . '…' : $plainBio;
+        }
+    }
+}
+$pageMeta = [
+    'description' => $description !== '' ? $profile['username'] . ': ' . $description : $pageTitle . ' | SolveClone topluluğunda profil detayları.',
+];
 $current = current_user();
 $message = null;
 $error = null;
@@ -76,22 +90,10 @@ require __DIR__ . '/partials/header.php';
   <?php endif; ?>
 
   <?php if ($current && $current['id'] !== $profile['id']): ?>
-    <div class="card border-0 shadow-sm mb-4">
-      <div class="card-body">
-        <h2 class="h5 fw-semibold mb-3"><?= h($profile['username']) ?> kullanıcısına soru sor</h2>
-        <form method="post">
-          <input type="hidden" name="_token" value="<?= h(csrf_token()) ?>">
-          <div class="mb-3">
-            <label class="form-label" for="question_body">Soru</label>
-            <textarea class="form-control" id="question_body" name="question_body" rows="3" required maxlength="500"></textarea>
-          </div>
-          <div class="form-check form-switch mb-3">
-            <input class="form-check-input" type="checkbox" role="switch" id="anonymousToggle" name="is_anonymous">
-            <label class="form-check-label" for="anonymousToggle">Anonim gönder</label>
-          </div>
-          <button type="submit" class="btn btn-primary">Soruyu Gönder</button>
-        </form>
-      </div>
+    <div class="d-flex justify-content-end mb-4">
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#askQuestionModal">
+        <span class="me-2" aria-hidden="true">📝</span> Soru Sor
+      </button>
     </div>
   <?php elseif (!$current): ?>
     <div class="alert alert-info">Soru sormak için <a href="/login.php">giriş yapın</a>.</div>
@@ -149,4 +151,37 @@ require __DIR__ . '/partials/header.php';
       </section>
     </div>
   </div>
+  <?php if ($current && $current['id'] !== $profile['id']): ?>
+    <button type="button" class="btn btn-primary btn-lg d-md-none floating-action" data-bs-toggle="modal" data-bs-target="#askQuestionModal" aria-label="<?= h($profile['username']) ?> kullanıcısına soru sor">
+      <span aria-hidden="true">Soru Sor</span>
+    </button>
+    <div class="modal fade" id="askQuestionModal" tabindex="-1" aria-labelledby="askQuestionModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="askQuestionModalLabel"><?= h($profile['username']) ?> kullanıcısına soru sor</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+          </div>
+          <form method="post" class="needs-validation" novalidate>
+            <div class="modal-body">
+              <input type="hidden" name="_token" value="<?= h(csrf_token()) ?>">
+              <div class="mb-3">
+                <label class="form-label" for="question_body">Soru</label>
+                <textarea class="form-control" id="question_body" name="question_body" rows="4" required maxlength="500"></textarea>
+                <div class="form-text">En fazla 500 karakter.</div>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="anonymousToggle" name="is_anonymous">
+                <label class="form-check-label" for="anonymousToggle">Soruyu anonim gönder</label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Vazgeç</button>
+              <button type="submit" class="btn btn-primary">Soruyu Gönder</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  <?php endif; ?>
 <?php require __DIR__ . '/partials/footer.php';

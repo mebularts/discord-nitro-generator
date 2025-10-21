@@ -2,6 +2,10 @@
 declare(strict_types=1);
 
 $pageTitle = 'Ana Sayfa';
+$pageMeta = [
+    'description' => 'SolveClone ile modern bulmaca ve soru-cevap topluluğuna katılın. Profilinizi özelleştirin, anonim veya görünür sorular sorun ve çevrimdışı çalışan PWA deneyiminin tadını çıkarın.',
+    'keywords' => 'bulmaca uygulaması, soru cevap platformu, anonim soru sor, pwa quiz, solveclone',
+];
 
 require_once __DIR__ . '/../app/bootstrap.php';
 

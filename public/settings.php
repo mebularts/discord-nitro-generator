@@ -16,6 +16,10 @@ if (!$user) {
 }
 
 $pageTitle = 'Profil Ayarları';
+$pageMeta = [
+    'description' => 'Profilinizi güncelleyin, avatarınızı yönetin ve SolveClone topluluğunda sorularınızın görünürlüğünü kontrol edin.',
+    'robots' => 'noindex, nofollow',
+];
 $message = null;
 $error = null;
 $social = $user['social_links'] ? json_decode($user['social_links'], true, 512, JSON_THROW_ON_ERROR) : [];

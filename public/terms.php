@@ -2,6 +2,9 @@
 declare(strict_types=1);
 
 $pageTitle = 'Kullanım Koşulları';
+$pageMeta = [
+    'description' => 'SolveClone kullanım koşulları ve topluluk kurallarını inceleyin.',
+];
 
 require_once __DIR__ . '/../app/bootstrap.php';
 

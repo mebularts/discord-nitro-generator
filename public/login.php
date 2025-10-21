@@ -11,6 +11,10 @@ use function App\redirect;
 use function App\current_user;
 
 $pageTitle = 'Giriş Yap';
+$pageMeta = [
+    'description' => 'SolveClone hesabınıza giriş yaparak profilinizi yönetin, sorularınızı ve bildirimlerinizi kontrol edin.',
+    'robots' => 'noindex, nofollow',
+];
 $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
